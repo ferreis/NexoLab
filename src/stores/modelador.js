@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { availableName, duplicateNameError, nameConflict } from '../modelNames.js'
-import { convertGroups, groupKey, validateGroup } from '../compositeUnique.js'
+import { convertGroups, groupKey, validateGroup, isCompositeOwner } from '../compositeUnique.js'
 import { checkExpression, convertChecks } from '../checkConstraints.js'
 import { compileCheckBuilder, cloneBuilder, builderUsesColumn, visitCheckConditions } from '../checkBuilder.js'
 
@@ -101,7 +101,7 @@ export const useModelStore=defineStore('modelador',()=>{
   const columns=computed(()=>selected.value?orderColumns(selected.value.colunas):[])
   const primaryKeyColumns=computed(()=>selected.value?.colunas.filter(c=>c.pk)||[])
   const isUnique=c=>c.unique||(c.pk&&primaryKeyColumns.value.length===1)
-  const isCompositeUnique=c=>c.uniqueComposto||selected.value?.uniqueCompostos.some(group=>group.colunas.includes(c.uid))||false
+  const isCompositeUnique=c=>c.uniqueComposto||selected.value?.uniqueCompostos.some(group=>isCompositeOwner(group,c.uid))||false
   const isUniqueEnabled=c=>isUnique(c)||isCompositeUnique(c)
   const isCheckEnabled=c=>c.checkEnabled||c.checks.length>0
   function setCheck(column,enabled){
@@ -121,7 +121,7 @@ export const useModelStore=defineStore('modelador',()=>{
     column.checkEnabled=true
   }
   function removeCheck(column,id){column.checks=column.checks.filter(check=>check.uid!==id)}
-  function clearColumnGroups(column){selected.value.uniqueCompostos=selected.value.uniqueCompostos.filter(group=>!group.colunas.includes(column.uid))}
+  function clearColumnGroups(column){selected.value.uniqueCompostos=selected.value.uniqueCompostos.filter(group=>!isCompositeOwner(group,column.uid))}
   function setUnique(column,enabled){
     if(column.pk&&primaryKeyColumns.value.length===1)return
     column.unique=enabled
