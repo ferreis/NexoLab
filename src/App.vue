@@ -132,7 +132,7 @@ async function copyPreview(){try{await navigator.clipboard.writeText(previewCont
 <template>
 <div class="app">
   <header class="topbar">
-    <div class="brand"><Database :size="23"/><div><strong>Nexo Lab</strong><small>Projetos PostgreSQL e Supabase, sem alterar o banco</small></div></div>
+    <div class="brand"><Database :size="23"/><div><strong>NexoDB Lab</strong><small>Projetos PostgreSQL e Supabase, sem alterar o banco</small></div></div>
     <div class="top-actions">
       <button class="btn ghost" @click="fileInput?.click()"><Upload :size="15"/> Importar</button>
       <button class="btn" @click="download('modelo-banco.json',json,'application/json')"><FileJson :size="15"/> JSON</button>

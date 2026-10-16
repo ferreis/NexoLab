@@ -1,4 +1,4 @@
-# Nexo Lab
+# NexoDB Lab
 
 Modelador visual de propostas de banco de dados PostgreSQL/Supabase, feito com **Vue 3**, **Pinia** e **Vite**.
 
@@ -7,7 +7,7 @@ Modelador visual de propostas de banco de dados PostgreSQL/Supabase, feito com *
 Requer Node.js 20.19+ (ou Node 22.12+ / 24+).
 
 ```bash
-git clone https://github.com/ferreis/ModeladorBanco.git NexoLab
+git clone https://github.com/ferreis/NexoLab.git NexoLab
 cd NexoLab
 git checkout Dev
 npm install
@@ -27,7 +27,7 @@ Abra o endereço mostrado pelo Vite (normalmente `http://localhost:5173`).
 - Reordenação das colunas pela alça de arrastar ou pelas setas do teclado, mantendo ID e datas fixos; ordem preservada ao salvar e exportar.
 - Exportação TXT/JSON e importação do JSON da ferramenta HTML anterior.
 - Persistência automática local via `localStorage`.
-- Regras de negócio, triggers e funções em um único campo de observações da tabela.
+- Regras de negócio, validações e triggers no campo Regra de cada coluna.
 
 **Não se conecta ao Supabase e não executa SQL.** O JSON é uma proposta para revisão.
 
@@ -43,7 +43,7 @@ npm run build
 
 ## Hospedagem no Cloudflare
 
-Endereço: https://nexo-lab.pages.dev
+Endereço: https://nexodblab.pages.dev
 
 A hospedagem usa Cloudflare Pages, servindo apenas o conteúdo de `dist/`. Não há backend nem banco de dados. O favicon da aba do navegador está em `public/favicon.svg`.
 
