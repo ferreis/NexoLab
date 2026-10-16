@@ -1,4 +1,4 @@
-# ModeladorBanco
+# Nexo Lab
 
 Modelador visual de propostas de banco de dados PostgreSQL/Supabase, feito com **Vue 3**, **Pinia** e **Vite**.
 
@@ -7,8 +7,8 @@ Modelador visual de propostas de banco de dados PostgreSQL/Supabase, feito com *
 Requer Node.js 20.19+ (ou Node 22.12+ / 24+).
 
 ```bash
-git clone https://github.com/ferreis/ModeladorBanco.git
-cd ModeladorBanco
+git clone https://github.com/ferreis/ModeladorBanco.git NexoLab
+cd NexoLab
 git checkout Dev
 npm install
 npm run dev
@@ -23,7 +23,8 @@ Abra o endereço mostrado pelo Vite (normalmente `http://localhost:5173`).
 - Suporte a ENUM, VARCHAR, NUMERIC, tipos comuns do PostgreSQL, PK, FK, NULL e UNIQUE.
 - Ajuda contextual para os tipos de dados.
 - Painéis esquerdo e direito recolhíveis com botões sempre acessíveis.
-- Prévia TXT/JSON atualizada automaticamente.
+- Prévia TXT/JSON atualizada automaticamente, com abas para o projeto inteiro ou apenas a tabela selecionada; copiar acompanha a aba ativa.
+- Reordenação das colunas pela alça de arrastar ou pelas setas do teclado, mantendo ID e datas fixos; ordem preservada ao salvar e exportar.
 - Exportação TXT/JSON e importação do JSON da ferramenta HTML anterior.
 - Persistência automática local via `localStorage`.
 - Regras de negócio, triggers e funções em um único campo de observações da tabela.
@@ -40,4 +41,24 @@ Ao marcar PK, o modelador exige imutabilidade e NOT NULL. Uma PK de uma coluna t
 npm run build
 ```
 
-A implantação e os testes completos no navegador ainda precisam ser realizados no ambiente local.
+## Hospedagem no Cloudflare
+
+Endereço: https://nexo-lab.pages.dev
+
+A hospedagem usa Cloudflare Pages, servindo apenas o conteúdo de `dist/`. Não há backend nem banco de dados. O favicon da aba do navegador está em `public/favicon.svg`.
+
+Para publicar atualizações com a CLI autenticada na conta do projeto:
+
+```bash
+npx wrangler login
+npm run deploy
+```
+
+Para conferir a configuração sem publicar:
+
+```bash
+npm run build
+npx wrangler pages dev dist
+```
+
+O salvamento continua no `localStorage` do navegador, separado por dispositivo, perfil e endereço do site. Dados salvos em `localhost` não aparecem automaticamente no endereço público: exporte o JSON local e importe no site publicado. Para usar o mesmo projeto em outro dispositivo, transfira o JSON da mesma forma. Limpar os dados do site remove o armazenamento local; mantenha uma exportação dos projetos que quiser guardar.

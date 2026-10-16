@@ -20,9 +20,9 @@ export const TYPES = [
   ['TEXT[]','Lista de textos.']
 ]
 const makeId=()=>crypto.randomUUID()
-export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:true,pk:false,unique:false,fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:''})
+export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:''})
 export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',finalidade:'',regras:'',colunas:[]})
-const base=()=>({version:2,projeto:'ModeladorBanco',schema:'rpg',tabelas:[]})
+const base=()=>({version:2,projeto:'Nexo Lab',schema:'rpg',tabelas:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
 export const isDefaultColumn=c=>['id','criado_em','atualizado_em'].includes(columnName(c))
 function orderColumns(columns){
@@ -41,7 +41,7 @@ function convertColumn(c){
 }
 function convert(input){
   if (!input || !Array.isArray(input.tabelas)) throw new Error('Arquivo sem a lista de tabelas')
-  return {version:2,projeto:String(input.projeto||'ModeladorBanco'),schema:String(input.schema_alvo||input.schema||'rpg'),tabelas:input.tabelas.map(t=>({
+  return {version:2,projeto:String(input.projeto||'Nexo Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),tabelas:input.tabelas.map(t=>({
     uid:t.uid||makeId(),nome:String(t.nome||''),finalidade:String(t.finalidade??t.descricao??''),
     regras:[String(t.regras??t.observacoes??''),t.automacoes?`Triggers e funções:\n${t.automacoes}`:''].filter(Boolean).join('\n\n'),
     colunas:orderColumns((t.colunas||[]).map(convertColumn))
@@ -61,9 +61,26 @@ export const useModelStore=defineStore('modelador',()=>{
   const columns=computed(()=>selected.value?orderColumns(selected.value.colunas):[])
   const primaryKeyColumns=computed(()=>selected.value?.colunas.filter(c=>c.pk)||[])
   const isUnique=c=>c.unique||(c.pk&&primaryKeyColumns.value.length===1)
+  function useDefaultKeyType(column){
+    column.tipo='BIGINT'
+    column.tamanho=''
+    column.escala=''
+    column.enumValores=[]
+  }
   function setPrimaryKey(column,enabled){
     column.pk=enabled
-    if(enabled){column.imutavel=true;column.nullable=false}
+    if(enabled){useDefaultKeyType(column);column.imutavel=true;column.nullable=false}
+  }
+  function setForeignKey(column,enabled){
+    column.fk=enabled
+    if(enabled)useDefaultKeyType(column)
+  }
+  function setForeignTable(column,tableName){
+    const previous=column.fkTabela.trim()
+    if(!column.nome.trim()||(previous&&column.nome===`${previous}_id`)){
+      column.nome=tableName.trim()?`${tableName.trim()}_id`:''
+    }
+    column.fkTabela=tableName
   }
   function addColumn(){if(selected.value)selected.value.colunas=orderColumns([...selected.value.colunas,makeColumn()])}
   function addDefaults(){
@@ -77,6 +94,16 @@ export const useModelStore=defineStore('modelador',()=>{
     for(const p of presets)if(!t.colunas.some(c=>c.nome.trim().toLowerCase()===p.nome))t.colunas.push({...makeColumn(),...p})
     t.colunas=orderColumns(t.colunas)
   }
+  function moveColumn(id,targetId,after=false){
+    const table=selected.value
+    if(!table||id===targetId)return false
+    const source=table.colunas.find(c=>c.uid===id), target=table.colunas.find(c=>c.uid===targetId)
+    if(!source||!target||isDefaultColumn(source)||isDefaultColumn(target))return false
+    const next=orderColumns(table.colunas).filter(c=>c.uid!==id)
+    next.splice(next.findIndex(c=>c.uid===targetId)+(after?1:0),0,source)
+    table.colunas=orderColumns(next)
+    return true
+  }
   function removeColumn(id){if(selected.value)selected.value.colunas=selected.value.colunas.filter(c=>c.uid!==id)}
   function importData(data){doc.value=convert(data);selectedId.value=doc.value.tabelas[0]?.uid||null}
   const exported=computed(()=>({
@@ -84,5 +111,5 @@ export const useModelStore=defineStore('modelador',()=>{
     tabelas:doc.value.tabelas.map(t=>({nome:t.nome,finalidade:t.finalidade,regras:t.regras,
       colunas:orderColumns(t.colunas).map(({uid,...c})=>({...c,...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,setPrimaryKey,addTable,removeTable,addColumn,addDefaults,removeColumn,importData,exported}
+  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported}
 })
