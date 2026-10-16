@@ -1,4 +1,4 @@
-import { formatCheckSQL } from './checkConstraints.js'
+import { formatCheckText } from './checkConstraints.js'
 
 const showSize=type=>['VARCHAR','CHAR','NUMERIC'].includes(type)
 
@@ -14,7 +14,8 @@ export function formatText(d){
       c.padrao?`DEFAULT ${c.padrao} (na criação)`:'',
       c.imutavel?'IMUTÁVEL após o primeiro preenchimento':'',
       c.tipo==='ENUM'?`ENUM [${c.enumValores.join(', ')}]`:'',
-      c.descricao?`Regra: ${c.descricao}`:''
-    ].filter(Boolean).join(' | ')+c.checks.map(check=>'\n'+formatCheckSQL(check.expressao).split('\n').map(line=>'  '+line).join('\n')).join(''))
-  ].join('\n'))].join('\n')
+      c.descricao?`Regra: ${c.descricao}`:'',
+      ...c.checks.map(check=>formatCheckText(check.expressao))
+    ].filter(Boolean).join(' | '))
+  ].filter(Boolean).join('\n'))].join('\n')
 }
