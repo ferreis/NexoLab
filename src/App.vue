@@ -29,6 +29,7 @@ const txt=computed(()=>{
 })
 const json=computed(()=>JSON.stringify(store.exported,null,2))
 async function importJson(e){const f=e.target.files?.[0];if(!f)return;try{const data=JSON.parse(await f.text());if(store.doc.tabelas.length&&!confirm('Substituir o projeto atual pelo arquivo importado?'))return;store.importData(data);toast('Projeto importado.')}catch(err){toast('Erro ao importar: '+err.message)}finally{e.target.value=''}}
+function confirmDelete(){if(window.confirm('Excluir a tabela selecionada?'))store.removeTable()}
 function help(t){helpType.value=helpType.value===t?'':t}
 function toggleCard(id){const next=new Set(collapsed.value);next.has(id)?next.delete(id):next.add(id);collapsed.value=next}
 function enumText(c){return c.enumValores.join('\n')}
@@ -66,7 +67,7 @@ async function copyPreview(){try{await navigator.clipboard.writeText(tab.value==
     </aside>
     <main class="editor panel">
       <template v-if="store.selected">
-        <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirm('Excluir a tabela selecionada?')&&store.removeTable()"><Trash2 :size="16"/> Excluir</button></div>
+        <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button></div>
         <div class="formgrid">
           <label>Nome da tabela<input v-model="store.selected.nome" placeholder="ex.: financeiro"/></label>
           <label>Finalidade da tabela<input v-model="store.selected.finalidade" placeholder="O que esta tabela armazena?"/></label>
