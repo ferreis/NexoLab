@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, useId } from 'vue'
-import { Plus, Trash2 } from 'lucide-vue-next'
+import { Trash2 } from 'lucide-vue-next'
 
 const props=defineProps({table:{type:Object,required:true},column:{type:Object,required:true},add:{type:Function,required:true},remove:{type:Function,required:true}})
 const open=ref(false), chosen=ref([]), error=ref(''), editorId=useId()
@@ -11,11 +11,11 @@ function save(){
   try{props.add([props.column.uid,...chosen.value]);chosen.value=[];error.value='';open.value=false}
   catch(err){error.value=err.message}
 }
+defineExpose({add:()=>{open.value=true;error.value=''}})
 </script>
 
 <template>
   <div class="composite-unique">
-    <button class="btn" :aria-expanded="open" :aria-controls="editorId" @click="open=!open"><Plus :size="14"/> Adicionar composição única</button>
     <p v-if="!groups.length" class="typehelp">Adicione uma combinação para definir a unicidade composta. A coluna não terá UNIQUE individual neste modo.</p>
     <p v-if="groups.length" class="typehelp">Desmarcar UNIQUE ou Composto remove as combinações desta coluna. Sem o modo composto, UNIQUE vale para a coluna individualmente.</p>
     <div v-for="group in groups" :key="group.uid" class="unique-group">
