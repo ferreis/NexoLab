@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { availableName, duplicateNameError, nameConflict } from '../modelNames.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -56,7 +57,17 @@ export const useModelStore=defineStore('modelador',()=>{
   const selectedId=ref(doc.value.tabelas[0]?.uid||null)
   const selected=computed(()=>doc.value.tabelas.find(t=>t.uid===selectedId.value)||null)
   watch(doc,v=>{try{localStorage.setItem('modelador-rpg-vue-v2',JSON.stringify(v))}catch{}},{deep:true})
-  function addTable(){const t=makeTable();doc.value.tabelas.push(t);selectedId.value=t.uid}
+  const nameError=computed(()=>duplicateNameError(doc.value.tabelas))
+  function addTable(){const t=makeTable();t.nome=availableName(doc.value.tabelas,t.nome);doc.value.tabelas.push(t);selectedId.value=t.uid}
+  function renameTable(table,name){
+    if(nameConflict(doc.value.tabelas,name,table))throw new Error(`Já existe uma tabela com o nome “${name.trim()}”. O nome anterior foi mantido.`)
+    table.nome=name.trim()
+  }
+  function renameColumn(column,name){
+    if(!selected.value?.colunas.includes(column))return
+    if(nameConflict(selected.value.colunas,name,column))throw new Error(`Já existe uma coluna com o nome “${name.trim()}” nesta tabela. O nome anterior foi mantido.`)
+    column.nome=name.trim()
+  }
   function removeTable(){doc.value.tabelas=doc.value.tabelas.filter(t=>t.uid!==selectedId.value);selectedId.value=doc.value.tabelas[0]?.uid||null}
   const columns=computed(()=>selected.value?orderColumns(selected.value.colunas):[])
   const primaryKeyColumns=computed(()=>selected.value?.colunas.filter(c=>c.pk)||[])
@@ -78,7 +89,7 @@ export const useModelStore=defineStore('modelador',()=>{
   function setForeignTable(column,tableName){
     const previous=column.fkTabela.trim()
     if(!column.nome.trim()||(previous&&column.nome===`${previous}_id`)){
-      column.nome=tableName.trim()?`${tableName.trim()}_id`:''
+      column.nome=tableName.trim()?availableName(selected.value.colunas,`${tableName.trim()}_id`,column):''
     }
     column.fkTabela=tableName
   }
@@ -105,11 +116,17 @@ export const useModelStore=defineStore('modelador',()=>{
     return true
   }
   function removeColumn(id){if(selected.value)selected.value.colunas=selected.value.colunas.filter(c=>c.uid!==id)}
-  function importData(data){doc.value=convert(data);selectedId.value=doc.value.tabelas[0]?.uid||null}
+  function importData(data){
+    const imported=convert(data)
+    const error=duplicateNameError(imported.tabelas)
+    if(error)throw new Error(error)
+    doc.value=imported
+    selectedId.value=doc.value.tabelas[0]?.uid||null
+  }
   const exported=computed(()=>({
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
     tabelas:doc.value.tabelas.map(t=>({nome:t.nome,
       colunas:orderColumns(t.colunas).map(({uid,...c})=>({...c,...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported}
+  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported}
 })
