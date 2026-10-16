@@ -92,8 +92,6 @@ function download(filename,text,type){const u=URL.createObjectURL(new Blob([text
 function formatText(d){
   return [`Projeto: ${d.projeto}\nSchema: ${d.schema_alvo}\n`,...d.tabelas.map(t=>[
     `\nTABELA: ${t.nome}`,
-    `Finalidade: ${t.finalidade||'Não definida'}`,
-    `Regras: ${t.regras||'Nenhuma'}`,
     t.colunas.filter(c=>c.pk).length>1?`Chave primária composta (combinação única): ${t.colunas.filter(c=>c.pk).map(c=>c.nome||'sem_nome').join(', ')}`:'',
     ...t.colunas.map(c=>[
       `- ${c.nome||'sem_nome'}: ${c.tipo}${showSize(c.tipo)&&c.tamanho?'('+c.tamanho+(c.tipo==='NUMERIC'&&c.escala?','+c.escala:'')+')':''}`,
@@ -101,7 +99,7 @@ function formatText(d){
       c.unique?'UNIQUE':'',c.padrao?`DEFAULT ${c.padrao} (na criação)`:'',
       c.imutavel?'IMUTÁVEL após o primeiro preenchimento':'',
       c.tipo==='ENUM'?`ENUM [${c.enumValores.join(', ')}]`:'',
-      c.descricao?`Regras e observações: ${c.descricao}`:''
+      c.descricao?`Regra: ${c.descricao}`:''
     ].filter(Boolean).join(' | '))
   ].join('\n'))].join('\n')
 }
@@ -162,8 +160,6 @@ async function copyPreview(){try{await navigator.clipboard.writeText(previewCont
         <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button></div>
         <div class="formgrid">
           <label>Nome da tabela<input v-model="store.selected.nome" placeholder="ex.: financeiro"/></label>
-          <label>Finalidade da tabela<input v-model="store.selected.finalidade" placeholder="O que esta tabela armazena?"/></label>
-          <label class="table-rules">Regras e observações<textarea v-model="store.selected.regras" rows="3" placeholder="Regras, validações, triggers e funções. Ex.: ao registrar um movimento, atualizar o saldo."/></label>
         </div>
         <div class="sectionhead columnsheading"><h2>Colunas <span class="subtle">({{store.selected.colunas.length}})</span></h2><div class="buttons"><button class="btn" :disabled="!store.columns.length" @click="toggleAllColumns"><ChevronDown v-if="allColumnsCollapsed" :size="15"/><ChevronUp v-else :size="15"/>{{allColumnsCollapsed?'Expandir todas':'Recolher todas'}}</button><button class="btn" @click="addDefaults"><Plus :size="15"/> ID e datas padrão</button><button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Coluna</button></div></div>
         <div v-if="!store.selected.colunas.length" class="empty">Nenhuma coluna cadastrada. Use <strong>ID e datas padrão</strong> ou adicione uma coluna.</div>
@@ -199,7 +195,7 @@ async function copyPreview(){try{await navigator.clipboard.writeText(previewCont
               <label>Coluna referenciada<input v-model="c.fkColuna" placeholder="id"/></label>
             </div>
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3" placeholder="Principal&#10;Direto&#10;Indireto"/></label>
-            <label>Regras da coluna e observações<textarea v-model="c.descricao" rows="2" placeholder="Explicação, limites CHECK ou regras..."/></label>
+            <label>Regra<textarea v-model="c.descricao" rows="2" placeholder="Regra, validação CHECK ou trigger da coluna..."/></label>
           </div>
         </article>
         <button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Adicionar coluna</button>

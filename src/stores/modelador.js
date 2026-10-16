@@ -108,7 +108,7 @@ export const useModelStore=defineStore('modelador',()=>{
   function importData(data){doc.value=convert(data);selectedId.value=doc.value.tabelas[0]?.uid||null}
   const exported=computed(()=>({
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
-    tabelas:doc.value.tabelas.map(t=>({nome:t.nome,finalidade:t.finalidade,regras:t.regras,
+    tabelas:doc.value.tabelas.map(t=>({nome:t.nome,
       colunas:orderColumns(t.colunas).map(({uid,...c})=>({...c,...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
   return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported}
