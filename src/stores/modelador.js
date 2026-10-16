@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { availableName, duplicateNameError, nameConflict } from '../modelNames.js'
 import { convertGroups, groupKey, validateGroup } from '../compositeUnique.js'
 import { checkExpression, convertChecks } from '../checkConstraints.js'
-import { compileCheckBuilder, cloneBuilder, builderUsesColumn } from '../checkBuilder.js'
+import { compileCheckBuilder, cloneBuilder, builderUsesColumn, visitCheckConditions } from '../checkBuilder.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -80,10 +80,10 @@ export const useModelStore=defineStore('modelador',()=>{
     column.nome=name.trim()
     for(const c of selected.value.colunas)for(const check of c.checks){
       if(!check.construtor)continue
-      for(const group of check.construtor.grupos)for(const condition of group.condicoes){
+      visitCheckConditions(check.construtor,condition=>{
         if(condition.coluna===previous)condition.coluna=column.nome
         if(condition.origem==='coluna'&&condition.valor===previous)condition.valor=column.nome
-      }
+      })
       check.expressao=compileCheckBuilder(check.construtor,selected.value.colunas)
     }
   }

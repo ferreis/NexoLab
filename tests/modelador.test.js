@@ -327,3 +327,19 @@ test('exportação e menu compartilham a ordem alfabética e atualizam após ren
   assert.equal(store.selectedId,selected)
   assert.equal(store.selected.nome,'abacate')
 })
+
+test('CHECK recursivo importa, exporta, renomeia e remove referências em qualquer nível',async()=>{
+  const {parseCheckSQL}=await import('../src/parseCheckSQL.js')
+  const store=parcelas()
+  const column=store.columns[1]
+  const tree=parseCheckSQL('numero > 0 AND (financeiro_id IS NOT NULL OR (numero = 1 AND (referencia IS NULL OR numero = 2)))',store.columns)
+  store.saveCheck(column,null,'',tree)
+  const exported=JSON.parse(JSON.stringify(store.exported))
+  store.importData(exported)
+  assert.deepEqual(store.exported,exported)
+  const target=store.columns.find(c=>c.nome==='referencia')
+  store.renameColumn(target,'observacao')
+  assert.match(store.columns[1].checks[0].expressao,/"observacao" IS NULL/)
+  assert.equal(store.removeColumn(target.uid),1)
+  assert.equal(store.columns[1].checks.length,0)
+})

@@ -2,16 +2,21 @@
 import { computed, ref, useId } from 'vue'
 import { Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-vue-next'
 import { formatCheckSQL } from '../checkConstraints.js'
-import { makeCheckBuilder, cloneBuilder, compileCheckBuilder } from '../checkBuilder.js'
+import { makeCheckTree, normalizeCheckBuilder, compileCheckBuilder } from '../checkBuilder.js'
+import { parseCheckSQL } from '../parseCheckSQL.js'
 import CheckBuilder from './CheckBuilder.vue'
 
 const props=defineProps({column:{type:Object,required:true},columns:{type:Array,required:true},save:{type:Function,required:true},remove:{type:Function,required:true}})
 const open=ref(!props.column.checks.length), expression=ref(''), editingId=ref(null), error=ref(''), inputId=useId()
 const expanded=ref(!props.column.checks.length)
-const advanced=ref(false), builder=ref(makeCheckBuilder(props.column))
+const advanced=ref(false), builder=ref(makeCheckTree(props.column))
 const preview=computed(()=>{try{return {sql:compileCheckBuilder(builder.value,props.columns),error:''}}catch(err){return {sql:'',error:err.message}}})
-function edit(check){editingId.value=check?.uid||null;expression.value=check?.expressao||'';builder.value=check?.construtor?cloneBuilder(check.construtor):makeCheckBuilder(props.column);advanced.value=!!check&&!check.construtor;error.value='';open.value=true;expanded.value=true}
-function switchMode(value){if(value&&!advanced.value)expression.value=preview.value.sql;advanced.value=value;error.value=''}
+function edit(check){editingId.value=check?.uid||null;expression.value=check?.expressao||'';builder.value=check?.construtor?normalizeCheckBuilder(check.construtor):makeCheckTree(props.column);advanced.value=!!check&&!check.construtor;error.value='';open.value=true;expanded.value=true}
+function convertSQL(){
+  try{const converted=parseCheckSQL(expression.value,props.columns);builder.value=converted;advanced.value=false;error.value=''}
+  catch(err){error.value=`Não foi possível converter: ${err.message} O SQL foi preservado no modo avançado.`}
+}
+function switchMode(value){if(!value&&advanced.value){convertSQL();return}if(value&&!advanced.value)expression.value=preview.value.sql;advanced.value=value;error.value=''}
 function submit(){
   try{props.save(editingId.value,advanced.value?expression.value:preview.value.sql,advanced.value?null:builder.value);expression.value='';editingId.value=null;error.value='';open.value=false;expanded.value=false}
   catch(err){error.value=err.message}
@@ -42,6 +47,8 @@ defineExpose({add:()=>edit()})
       <template v-else>
         <label :for="`${inputId}-sql`">Expressão SQL do CHECK</label>
         <textarea :id="`${inputId}-sql`" v-model="expression" rows="4" placeholder="valor > 0 ou numero >= 1" :aria-invalid="!!error" :aria-describedby="error?`${inputId}-error`:`${inputId}-help`" @input="error=''"/>
+        <button class="btn" :disabled="!expression.trim()" @click="convertSQL">Converter para seleções</button>
+        <p class="fieldhelp">Converte parênteses, AND/OR, comparações, valores booleanos e IS NULL/IS NOT NULL. Funções e outras expressões continuam disponíveis no SQL avançado.</p>
         <p :id="`${inputId}-help`" class="fieldhelp">Informe somente a expressão, sem CHECK (...). Expressões avançadas precisam ser revisadas ao renomear ou excluir colunas.</p>
       </template>
       <p v-if="error" :id="`${inputId}-error`" class="name-error" role="alert">{{error}}</p>
