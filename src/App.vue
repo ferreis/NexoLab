@@ -7,7 +7,7 @@ import CompositeUniqueEditor from './components/CompositeUniqueEditor.vue'
 import ColumnBadges from './components/ColumnBadges.vue'
 import HelpTooltip from './components/HelpTooltip.vue'
 import CheckEditor from './components/CheckEditor.vue'
-import { formatCheckSQL } from './checkConstraints.js'
+import { formatText } from './textExport.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
@@ -97,22 +97,6 @@ const fks=['BIGINT','INTEGER','SMALLINT','UUID','TEXT','VARCHAR']
 const showSize=t=>sizes.includes(t)
 const toast=t=>{notice.value=t;setTimeout(()=>notice.value='',3000)}
 function download(filename,text,type){if(store.nameError){toast(store.nameError);return}const u=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),500)}
-function formatText(d){
-  return [`Projeto: ${d.projeto}\nSchema: ${d.schema_alvo}\n`,...d.tabelas.map(t=>[
-    `\nTABELA: ${t.nome}`,
-    t.colunas.filter(c=>c.pk).length>1?`Chave primária composta (combinação única): ${t.colunas.filter(c=>c.pk).map(c=>c.nome||'sem_nome').join(', ')}`:'',
-    ...t.uniqueCompostos.map(group=>`UNIQUE composto (${group.colunas.join(', ')}): a combinação dos valores não pode se repetir.`),
-    ...t.colunas.flatMap(c=>c.checks.map(check=>`${formatCheckSQL(check.expressao)} — cadastrado em ${c.nome||'sem_nome'}`)),
-    ...t.colunas.map(c=>[
-      `- ${c.nome||'sem_nome'}: ${c.tipo}${showSize(c.tipo)&&c.tamanho?'('+c.tamanho+(c.tipo==='NUMERIC'&&c.escala?','+c.escala:'')+')':''}`,
-      c.pk?'PK':'',c.fk?`FK -> ${c.fkTabela}.${c.fkColuna||'id'}`:'',c.nullable?'NULL':'NOT NULL',
-      c.unique?'UNIQUE':'',c.padrao?`DEFAULT ${c.padrao} (na criação)`:'',
-      c.imutavel?'IMUTÁVEL após o primeiro preenchimento':'',
-      c.tipo==='ENUM'?`ENUM [${c.enumValores.join(', ')}]`:'',
-      c.descricao?`Regra: ${c.descricao}`:''
-    ].filter(Boolean).join(' | '))
-  ].join('\n'))].join('\n')
-}
 const txt=computed(()=>formatText(store.exported))
 const json=computed(()=>JSON.stringify(store.exported,null,2))
 const previewData=computed(()=>{
