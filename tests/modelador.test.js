@@ -312,3 +312,18 @@ test('importação recusa construtor CHECK inconsistente com a expressão',async
   assert.throws(()=>store.importData(exported),/não corresponde/)
   assert.equal(store.doc,original)
 })
+
+test('exportação e menu compartilham a ordem alfabética e atualizam após renomear',()=>{
+  const store=useModelStore()
+  const original=['zebra','Clientes','áreas','bancos']
+  store.importData({tabelas:original.map(nome=>({nome,colunas:[]}))})
+  const expected=['áreas','bancos','Clientes','zebra']
+  assert.deepEqual(store.sortedTables.map(t=>t.nome),expected)
+  assert.deepEqual(store.exported.tabelas.map(t=>t.nome),expected)
+  assert.deepEqual(store.doc.tabelas.map(t=>t.nome),original)
+  const selected=store.selectedId
+  store.renameTable(store.selected,'abacate')
+  assert.deepEqual(store.exported.tabelas.map(t=>t.nome),['abacate','áreas','bancos','Clientes'])
+  assert.equal(store.selectedId,selected)
+  assert.equal(store.selected.nome,'abacate')
+})

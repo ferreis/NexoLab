@@ -9,7 +9,6 @@ import CheckEditor from './components/CheckEditor.vue'
 import { formatCheckSQL } from './checkConstraints.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
-const sortedTables=computed(()=>[...store.doc.tabelas].sort((a,b)=>a.nome.trim().localeCompare(b.nome.trim(),'pt-BR',{sensitivity:'base'})))
 const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const previewScope=ref('all'), formatOpen=ref(false)
@@ -115,7 +114,7 @@ const txt=computed(()=>formatText(store.exported))
 const json=computed(()=>JSON.stringify(store.exported,null,2))
 const previewData=computed(()=>{
   if(previewScope.value==='all')return store.exported
-  const index=store.doc.tabelas.findIndex(t=>t.uid===store.selectedId)
+  const index=store.sortedTables.findIndex(t=>t.uid===store.selectedId)
   return {...store.exported,tabelas:index<0?[]:[store.exported.tabelas[index]]}
 })
 const previewContent=computed(()=>tab.value==='txt'?formatText(previewData.value):JSON.stringify(previewData.value,null,2))
@@ -157,7 +156,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <label>Projeto<input v-model="store.doc.projeto" placeholder="Nome do projeto"/></label>
         <label>Schema<input v-model="store.doc.schema" placeholder="rpg"/></label>
         <nav class="tablelist">
-          <button v-for="t in sortedTables" :key="t.uid" class="tablebtn" :title="t.nome||'Sem nome'" :class="{active:store.selectedId===t.uid}" @click="store.selectedId=t.uid">
+          <button v-for="t in store.sortedTables" :key="t.uid" class="tablebtn" :title="t.nome||'Sem nome'" :class="{active:store.selectedId===t.uid}" @click="store.selectedId=t.uid">
             <Database :size="15"/><span>{{t.nome||'Sem nome'}}</span><small>{{t.colunas.length}}</small>
           </button>
         </nav>
