@@ -171,7 +171,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
       <template v-if="store.selected">
         <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button></div>
         <div class="formgrid">
-          <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)" placeholder="ex.: financeiro"/></label>
+          <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)"/></label>
         </div>
         <div class="sectionhead columnsheading"><h2>Colunas <span class="subtle">({{store.selected.colunas.length}})</span></h2><div class="buttons"><button class="btn" :disabled="!store.columns.length" @click="toggleAllColumns"><ChevronDown v-if="allColumnsCollapsed" :size="15"/><ChevronUp v-else :size="15"/>{{allColumnsCollapsed?'Expandir todas':'Recolher todas'}}</button><button class="btn" @click="addDefaults"><Plus :size="15"/> ID e datas padrão</button><button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Coluna</button></div></div>
         <div v-if="!store.selected.colunas.length" class="empty">Nenhuma coluna cadastrada. Use <strong>ID e datas padrão</strong> ou adicione uma coluna.</div>
@@ -180,24 +180,24 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           <div class="columnhead"><button v-if="!isDefaultColumn(c)" class="drag-handle" draggable="true" :aria-label="`Reordenar coluna ${c.nome||'sem nome'}`" aria-describedby="reorder-help" title="Arrastar para reordenar · ↑ ↓ pelo teclado" @dragstart="startDrag($event,c)" @dragend="endDrag" @keydown="moveWithKeyboard($event,c)"><GripVertical :size="17"/></button><button class="cardtoggle" :aria-expanded="!collapsed.has(c.uid)" @click="toggleCard(c.uid)"><ChevronDown v-if="!collapsed.has(c.uid)" :size="16"/><ChevronUp v-else :size="16"/><strong>{{c.nome||'Nova coluna'}}</strong> <small>{{c.tipo}}</small><ColumnBadges :column="c" :table="store.selected"/></button><button class="iconbtn danger" title="Excluir coluna" @click="removeColumn(c.uid)"><Trash2 :size="16"/></button></div>
           <div v-if="!collapsed.has(c.uid)" class="columnbody">
             <div class="fields3" :class="{fields2:!showSize(c.tipo)}">
-              <label>Nome<NameInput label="Nome" :model-value="c.nome" :commit="name=>store.renameColumn(c,name)" placeholder="ex.: ficha_id"/></label>
+              <label>Nome<NameInput label="Nome" :model-value="c.nome" :commit="name=>store.renameColumn(c,name)"/></label>
               <label>Tipo de dado <button class="hint" type="button" :title="typeInfo(c.tipo)" @click="help(c.uid)"><Info :size="15"/></button>
                 <select :value="c.tipo" @change="setType(c,$event.target.value)"><option v-for="[name] in TYPES" :key="name" :value="name">{{name}}</option></select>
               </label>
-              <label v-if="showSize(c.tipo)">{{c.tipo==='NUMERIC'?'Precisão':'Comprimento máximo'}}<input v-model="c.tamanho" type="number" min="1" placeholder="ex.: 255"/></label>
+              <label v-if="showSize(c.tipo)">{{c.tipo==='NUMERIC'?'Precisão':'Comprimento máximo'}}<input v-model="c.tamanho" type="number" min="1"/></label>
             </div>
-            <p v-if="helpType===c.uid" class="typehelp">{{c.tipo}}: {{typeInfo(c.tipo)}} <span v-if="c.tipo==='VARCHAR'">Ex.: VARCHAR(255).</span><span v-if="c.tipo==='NUMERIC'">Ex.: NUMERIC(10,2).</span></p>
+            <p v-if="helpType===c.uid" class="typehelp">{{c.tipo}}: {{typeInfo(c.tipo)}}</p>
             <div class="column-options" :class="{'has-scale':c.tipo==='NUMERIC','without-default':c.pk||c.fk}">
               <div v-if="c.tipo==='NUMERIC'||(!c.pk&&!c.fk)" class="fields2 defaultsrow">
-                <label v-if="c.tipo==='NUMERIC'">Casas decimais<input v-model="c.escala" type="number" min="0" placeholder="ex.: 2"/></label>
-                <label v-if="!c.pk&&!c.fk">Valor padrão na criação<input v-model="c.padrao" placeholder="Sem padrão definido"/><span class="fieldhelp">Usado ao criar o registro quando o valor não é informado. Ex.: now(), 0, FALSE.</span></label>
+                <label v-if="c.tipo==='NUMERIC'">Casas decimais<input v-model="c.escala" type="number" min="0"/></label>
+                <label v-if="!c.pk&&!c.fk">Valor padrão na criação<input v-model="c.padrao" placeholder="Sem padrão definido"/></label>
               </div>
               <div class="checkrow">
                 <label v-if="c.pk||!store.primaryKeyColumns.length" class="check"><input :checked="c.pk" type="checkbox" @change="store.setPrimaryKey(c,$event.target.checked)"/> <KeyRound :size="14"/> PK</label>
                 <label class="check"><input v-model="c.nullable" type="checkbox" :disabled="c.pk"/> Permite NULL</label>
-                <HelpTooltip label="Imutável" text="Após o primeiro preenchimento, esta coluna não deve aceitar alterações. Regra incluída na proposta; precisa ser implementada no banco ou na aplicação."><label class="check"><input v-model="c.imutavel" type="checkbox" :disabled="c.pk"/> Imutável</label></HelpTooltip>
-                <HelpTooltip label="UNIQUE" text="UNIQUE exige valores únicos nesta coluna. Para exigir apenas a combinação com outras colunas, ative Composto."><label class="check"><input :checked="store.isUniqueEnabled(c)" type="checkbox" :disabled="c.pk && store.primaryKeyColumns.length===1" @change="store.setUnique(c,$event.target.checked)"/> UNIQUE</label></HelpTooltip>
-                <HelpTooltip v-if="store.isUniqueEnabled(c)&&(!c.pk||store.primaryKeyColumns.length!==1||store.isCompositeUnique(c))" label="Composto" :text="`Adicione uma combinação para definir a unicidade composta. A coluna não terá UNIQUE individual neste modo. Combine ${c.nome||'esta coluna'} com outras colunas: só a combinação inteira precisa ser única. Ex.: (financeiro_id, numero). Desmarcar UNIQUE ou Composto remove as combinações desta coluna.`"><label class="check"><input :checked="store.isCompositeUnique(c)" type="checkbox" :disabled="c.pk&&store.primaryKeyColumns.length===1" @change="store.setCompositeUnique(c,$event.target.checked)"/> Composto</label></HelpTooltip>
+                <HelpTooltip label="Imutável" text="Impede alterações após o primeiro preenchimento da coluna."><label class="check"><input v-model="c.imutavel" type="checkbox" :disabled="c.pk"/> Imutável</label></HelpTooltip>
+                <HelpTooltip label="UNIQUE" text="Impede valores repetidos nesta coluna. Composto aplica a unicidade à combinação de colunas."><label class="check"><input :checked="store.isUniqueEnabled(c)" type="checkbox" :disabled="c.pk && store.primaryKeyColumns.length===1" @change="store.setUnique(c,$event.target.checked)"/> UNIQUE</label></HelpTooltip>
+                <HelpTooltip v-if="store.isUniqueEnabled(c)&&(!c.pk||store.primaryKeyColumns.length!==1||store.isCompositeUnique(c))" label="Composto" text="Exige que a combinação das colunas selecionadas seja única. Os valores individuais podem se repetir quando não houver outra restrição de unicidade. Desmarcar UNIQUE ou Composto remove as combinações desta coluna."><label class="check"><input :checked="store.isCompositeUnique(c)" type="checkbox" :disabled="c.pk&&store.primaryKeyColumns.length===1" @change="store.setCompositeUnique(c,$event.target.checked)"/> Composto</label></HelpTooltip>
                 <label class="check"><input :checked="store.isCheckEnabled(c)" type="checkbox" @change="store.setCheck(c,$event.target.checked)"/> CHECK</label>
                 <label class="check"><input :checked="c.fk" type="checkbox" @change="store.setForeignKey(c,$event.target.checked)"/> <KeyRound :size="14"/> FK</label>
               </div>
@@ -211,10 +211,10 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               <label>Tabela referenciada<TableCombobox :model-value="c.fkTabela" :options="store.doc.tabelas.map(t=>t.nome)" @update:model-value="store.setForeignTable(c,$event)"/></label>
               <label>Coluna referenciada<input v-model="c.fkColuna" placeholder="id"/></label>
             </div>
-            <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3" placeholder="Principal&#10;Direto&#10;Indireto"/></label>
+            <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3"/></label>
             <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :ref="instance=>registerEditor(uniqueEditors,c.uid,instance)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
             <CheckEditor v-if="store.isCheckEnabled(c)" :ref="instance=>registerEditor(checkEditors,c.uid,instance)" :column="c" :columns="store.selected.colunas" :save="(id,expression,builder)=>store.saveCheck(c,id,expression,builder)" :remove="id=>store.removeCheck(c,id)"/>
-            <label>Regra<textarea v-model="c.descricao" rows="2" placeholder="Regra, validação CHECK ou trigger da coluna..."/></label>
+            <label>Regra<textarea v-model="c.descricao" rows="2"/></label>
           </div>
         </article>
         <button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Adicionar coluna</button>

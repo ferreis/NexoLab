@@ -8,6 +8,10 @@ const open=ref(false), chosen=ref([]), error=ref(''), editorId=useId()
 const others=computed(()=>props.table.colunas.filter(c=>c.uid!==props.column.uid&&c.nome.trim()))
 const groups=computed(()=>props.table.uniqueCompostos.filter(group=>group.colunas.includes(props.column.uid)))
 const groupColumns=group=>group.colunas.map(id=>props.table.colunas.find(c=>c.uid===id))
+function groupHelp(group){
+  const columns=groupColumns(group)
+  return ['A combinação destas colunas deve ser única.',columns.some(c=>c.unique||(c.pk&&props.table.colunas.filter(c=>c.pk).length===1))?'Uma das colunas também possui unicidade individual.':'',columns.some(c=>c.nullable)?'Combinações que contenham NULL podem se repetir.':''].filter(Boolean).join(' ')
+}
 function save(){
   try{props.add([props.column.uid,...chosen.value]);chosen.value=[];error.value='';open.value=false}
   catch(err){error.value=err.message}
@@ -18,14 +22,12 @@ defineExpose({add:()=>{open.value=true;error.value=''}})
 <template>
   <div v-if="groups.length||open" class="composite-unique">
     <div v-for="group in groups" :key="group.uid" class="unique-group">
-      <span>UNIQUE ({{groupColumns(group).map(c=>c.nome).join(', ')}})</span>
+      <HelpTooltip label="Composição única" :text="groupHelp(group)"><span>UNIQUE ({{groupColumns(group).map(c=>c.nome).join(', ')}})</span></HelpTooltip>
       <button class="iconbtn danger" :aria-label="`Remover UNIQUE composto (${groupColumns(group).map(c=>c.nome).join(', ')})`" @click="remove(group.uid)"><Trash2 :size="14"/></button>
-      <HelpTooltip v-if="groupColumns(group).some(c=>c.unique||(c.pk&&table.colunas.filter(c=>c.pk).length===1))" label="Unicidade individual" text="Uma destas colunas também tem unicidade individual. Para permitir repetições fora da combinação, revise o UNIQUE individual ou a PK."/>
-      <HelpTooltip v-if="groupColumns(group).some(c=>c.nullable)" label="NULL na composição" text="Com Permite NULL, o PostgreSQL permite repetir combinações que contenham NULL. Para exigir todos os valores, desmarque Permite NULL nas colunas da combinação."/>
     </div>
     <div v-if="open" :id="editorId" class="unique-picker">
       <fieldset>
-        <legend>Colunas da combinação <HelpTooltip label="Colunas da combinação" :text="`Combine ${column.nome||'esta coluna'} com outras colunas. Só a combinação inteira precisa ser única. Ex.: (financeiro_id, numero).`"/></legend>
+        <legend>Colunas da combinação</legend>
         <label v-for="other in others" :key="other.uid" class="check"><input v-model="chosen" type="checkbox" :value="other.uid"/>{{other.nome}}</label>
       </fieldset>
       <p v-if="!others.length" class="typehelp">Adicione e nomeie outra coluna para formar a combinação.</p>
