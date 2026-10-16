@@ -129,7 +129,7 @@ async function confirmDelete(){
   }
 }
 function help(t){helpType.value=helpType.value===t?'':t}
-function removeColumn(id){if(store.removeColumn(id))toast('Coluna excluída. As combinações UNIQUE que a utilizavam também foram removidas.')}
+function removeColumn(id){if(store.removeColumn(id))toast('Coluna excluída. As composições UNIQUE e os CHECKs do construtor que dependiam dela também foram removidos.')}
 function toggleCard(id){const next=new Set(collapsed.value);next.has(id)?next.delete(id):next.add(id);collapsed.value=next}
 function enumText(c){return c.enumValores.join('\n')}
 function setEnum(c,str){c.enumValores=str.split(/[,\n]/).map(s=>s.trim()).filter(Boolean)}
@@ -208,7 +208,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
             </div>
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3" placeholder="Principal&#10;Direto&#10;Indireto"/></label>
             <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
-            <CheckEditor v-if="store.isCheckEnabled(c)" :column="c" :save="(id,expression)=>store.saveCheck(c,id,expression)" :remove="id=>store.removeCheck(c,id)"/>
+            <CheckEditor v-if="store.isCheckEnabled(c)" :column="c" :columns="store.selected.colunas" :save="(id,expression,builder)=>store.saveCheck(c,id,expression,builder)" :remove="id=>store.removeCheck(c,id)"/>
             <label>Regra<textarea v-model="c.descricao" rows="2" placeholder="Regra, validação CHECK ou trigger da coluna..."/></label>
           </div>
         </article>

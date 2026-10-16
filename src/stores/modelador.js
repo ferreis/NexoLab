@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { availableName, duplicateNameError, nameConflict } from '../modelNames.js'
 import { convertGroups, groupKey, validateGroup } from '../compositeUnique.js'
 import { checkExpression, convertChecks } from '../checkConstraints.js'
+import { compileCheckBuilder, cloneBuilder, builderUsesColumn } from '../checkBuilder.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -47,6 +48,7 @@ function convert(input){
   if (!input || !Array.isArray(input.tabelas)) throw new Error('Arquivo sem a lista de tabelas')
   return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),tabelas:input.tabelas.map(t=>{
     const colunas=orderColumns((t.colunas||[]).map(convertColumn))
+    for(const column of colunas)for(const check of column.checks)if(check.construtor&&compileCheckBuilder(check.construtor,colunas)!==check.expressao)throw new Error('A expressão CHECK não corresponde às condições do construtor.')
     return {
     uid:t.uid||makeId(),nome:String(t.nome||''),finalidade:String(t.finalidade??t.descricao??''),
     regras:[String(t.regras??t.observacoes??''),t.automacoes?`Triggers e funções:\n${t.automacoes}`:''].filter(Boolean).join('\n\n'),
@@ -70,9 +72,19 @@ export const useModelStore=defineStore('modelador',()=>{
   }
   function renameColumn(column,name){
     if(!selected.value?.colunas.includes(column))return
+    if(!name.trim()&&selected.value.colunas.some(c=>c.checks.some(check=>check.construtor&&builderUsesColumn(check.construtor,column.nome))))throw new Error('Esta coluna é usada em um CHECK e precisa manter um nome.')
     if(!name.trim()&&selected.value.uniqueCompostos.some(group=>group.colunas.includes(column.uid)))throw new Error('Esta coluna participa de um UNIQUE composto e precisa manter um nome.')
     if(nameConflict(selected.value.colunas,name,column))throw new Error(`Já existe uma coluna com o nome “${name.trim()}” nesta tabela. O nome anterior foi mantido.`)
+    const previous=column.nome
     column.nome=name.trim()
+    for(const c of selected.value.colunas)for(const check of c.checks){
+      if(!check.construtor)continue
+      for(const group of check.construtor.grupos)for(const condition of group.condicoes){
+        if(condition.coluna===previous)condition.coluna=column.nome
+        if(condition.origem==='coluna'&&condition.valor===previous)condition.valor=column.nome
+      }
+      check.expressao=compileCheckBuilder(check.construtor,selected.value.colunas)
+    }
   }
   function addCompositeUnique(ids){
     const table=selected.value
@@ -95,14 +107,16 @@ export const useModelStore=defineStore('modelador',()=>{
     column.checkEnabled=enabled
     if(!enabled)column.checks=[]
   }
-  function saveCheck(column,id,expression){
+  function saveCheck(column,id,expression,builder=null){
     if(!selected.value?.colunas.includes(column))return
-    const expressao=checkExpression(expression)
+    const expressao=builder?compileCheckBuilder(builder,selected.value.colunas):checkExpression(expression)
+    const fields={expressao,...(builder?{construtor:cloneBuilder(builder)}:{})}
     if(id){
       const check=column.checks.find(check=>check.uid===id)
       if(!check)throw new Error('Esta restrição CHECK não existe mais.')
-      check.expressao=expressao
-    }else column.checks.push({uid:makeId(),expressao})
+      delete check.construtor
+      Object.assign(check,fields)
+    }else column.checks.push({uid:makeId(),...fields})
     column.checkEnabled=true
   }
   function removeCheck(column,id){column.checks=column.checks.filter(check=>check.uid!==id)}
@@ -137,7 +151,8 @@ export const useModelStore=defineStore('modelador',()=>{
     const previous=column.fkTabela.trim()
     if(!column.nome.trim()||(previous&&column.nome===`${previous}_id`)){
       const name=tableName.trim()?availableName(selected.value.colunas,`${tableName.trim()}_id`,column):''
-      if(name||!selected.value.uniqueCompostos.some(group=>group.colunas.includes(column.uid)))renameColumn(column,name)
+      const used=selected.value.uniqueCompostos.some(group=>group.colunas.includes(column.uid))||selected.value.colunas.some(c=>c.checks.some(check=>check.construtor&&builderUsesColumn(check.construtor,column.nome)))
+      if(name||!used)renameColumn(column,name)
     }
     column.fkTabela=tableName
   }
@@ -169,7 +184,13 @@ export const useModelStore=defineStore('modelador',()=>{
   function removeColumn(id){
     if(!selected.value)return 0
     const table=selected.value
-    const removed=table.uniqueCompostos.filter(group=>group.colunas.includes(id)).length
+    const name=table.colunas.find(c=>c.uid===id)?.nome
+    let removed=table.uniqueCompostos.filter(group=>group.colunas.includes(id)).length
+    for(const column of table.colunas){
+      const next=column.checks.filter(check=>!check.construtor||!builderUsesColumn(check.construtor,name))
+      removed+=column.checks.length-next.length
+      column.checks=next
+    }
     table.uniqueCompostos=table.uniqueCompostos.filter(group=>!group.colunas.includes(id))
     table.colunas=table.colunas.filter(c=>c.uid!==id)
     return removed
@@ -185,7 +206,7 @@ export const useModelStore=defineStore('modelador',()=>{
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
     tabelas:doc.value.tabelas.map(t=>({nome:t.nome,
       uniqueCompostos:t.uniqueCompostos.map(group=>({colunas:group.colunas.map(id=>t.colunas.find(c=>c.uid===id).nome)})),
-      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,checks:checks.map(({expressao})=>({expressao})),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
+      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,checks:checks.map(({uid,...check})=>check),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
   return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported,addCompositeUnique,removeCompositeUnique}
 })
