@@ -9,6 +9,8 @@ import CheckEditor from './components/CheckEditor.vue'
 import { formatCheckSQL } from './checkConstraints.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
+const checkEditors=new Map(), uniqueEditors=new Map()
+function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
 const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const previewScope=ref('all'), formatOpen=ref(false)
@@ -199,6 +201,10 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
                 <label class="check"><input :checked="c.fk" type="checkbox" @change="store.setForeignKey(c,$event.target.checked)"/> <KeyRound :size="14"/> FK</label>
               </div>
             </div>
+            <div v-if="store.isCompositeUnique(c)||store.isCheckEnabled(c)" class="rule-actions">
+              <button v-if="store.isCompositeUnique(c)" class="btn" @click="uniqueEditors.get(c.uid)?.add()"><Plus :size="14"/>Adicionar unique compose</button>
+              <button v-if="store.isCheckEnabled(c)" class="btn" @click="checkEditors.get(c.uid)?.add()"><Plus :size="14"/>Adicionar CHECK</button>
+            </div>
             <p v-if="c.pk && store.primaryKeyColumns.length>1" class="typehelp">Estas colunas formam uma única PK composta: a combinação dos valores é única. Marque UNIQUE apenas se esta coluna também precisar ser única individualmente.</p>
             <p v-if="c.imutavel" class="rulehelp"><Info :size="15"/><span>Após o primeiro preenchimento, esta coluna não deve aceitar alterações. Regra incluída na proposta; precisa ser implementada no banco ou na aplicação.</span></p>
             <div class="fields2" v-if="c.fk">
@@ -206,8 +212,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               <label>Coluna referenciada<input v-model="c.fkColuna" placeholder="id"/></label>
             </div>
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3" placeholder="Principal&#10;Direto&#10;Indireto"/></label>
-            <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
-            <CheckEditor v-if="store.isCheckEnabled(c)" :column="c" :columns="store.selected.colunas" :save="(id,expression,builder)=>store.saveCheck(c,id,expression,builder)" :remove="id=>store.removeCheck(c,id)"/>
+            <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :ref="instance=>registerEditor(uniqueEditors,c.uid,instance)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
+            <CheckEditor v-if="store.isCheckEnabled(c)" :ref="instance=>registerEditor(checkEditors,c.uid,instance)" :column="c" :columns="store.selected.colunas" :save="(id,expression,builder)=>store.saveCheck(c,id,expression,builder)" :remove="id=>store.removeCheck(c,id)"/>
             <label>Regra<textarea v-model="c.descricao" rows="2" placeholder="Regra, validação CHECK ou trigger da coluna..."/></label>
           </div>
         </article>
