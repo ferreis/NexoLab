@@ -29,6 +29,7 @@ Abra o endereço mostrado pelo Vite (normalmente `http://localhost:5173`).
 - Persistência automática local via `localStorage`.
 - Regras de negócio, validações e triggers no campo Regra de cada coluna.
 - UNIQUE composto configurado dentro das colunas, com seleção das demais colunas da combinação e exportação em TXT/JSON.
+- CHECK com múltiplas expressões SQL por coluna, incluindo condições que envolvem várias colunas da mesma linha, edição e exportação em TXT/JSON.
 
 **Não se conecta ao Supabase e não executa SQL.** O JSON é uma proposta para revisão.
 
@@ -36,11 +37,15 @@ Os presets são exibidos fechados: `id` sempre no início, `criado_em` e `atuali
 
 Ao marcar PK, o modelador exige imutabilidade e NOT NULL. Uma PK de uma coluna também marca UNIQUE automaticamente. Se várias colunas forem marcadas como PK, elas formam uma única chave composta: a unicidade vale para a combinação, e UNIQUE individual continua opcional. Desmarcar PK mantém as opções explícitas de imutabilidade e nulidade para revisão. FK, por si só, permite valores repetidos. A imutabilidade é uma regra desta ferramenta, não uma restrição implícita de PK no PostgreSQL.
 
-Para números de parcelas únicos por financeiro, abra uma das colunas, marque **UNIQUE**, depois **UNIQUE composto** e clique em **Adicionar composição única**. Selecione a outra coluna e adicione a combinação `(financeiro_id, numero)`. Assim, `(1, 6)` e `(2, 6)` são permitidos, mas duas ocorrências de `(1, 6)` são rejeitadas quando a restrição for implementada no banco. O modo composto desativa o UNIQUE individual. Desmarcá-lo remove as combinações da coluna e volta ao UNIQUE individual; desmarcar UNIQUE remove também suas combinações. As colunas não precisam ser FKs para participar.
+Para números de parcelas únicos por financeiro, abra uma das colunas, marque **UNIQUE**, depois **Composto** e clique em **Adicionar composição única**. Selecione a outra coluna e adicione a combinação `(financeiro_id, numero)`. Assim, `(1, 6)` e `(2, 6)` são permitidos, mas duas ocorrências de `(1, 6)` são rejeitadas quando a restrição for implementada no banco. O modo composto desativa o UNIQUE individual. Desmarcá-lo remove as combinações da coluna e volta ao UNIQUE individual; desmarcar UNIQUE remove também suas combinações. As colunas não precisam ser FKs para participar.
 
 Depois de definir uma PK, a opção PK fica oculta nas outras colunas. A coluna que já é PK mantém o controle para permitir desmarcá-la e escolher outra. O botão de ID e datas padrão preserva a PK existente e não adiciona outra. Modelos antigos com PK composta continuam sendo importados.
 
 O JSON inclui `uniqueCompostos: [{ "colunas": ["financeiro_id", "numero"] }]` em cada tabela; o TXT descreve a mesma combinação. Os grupos acompanham renomeações e reordenações, são restaurados ao importar e aparecem nas colunas participantes. Excluir uma coluna remove as combinações inteiras que dependiam dela. Se Permite NULL estiver marcado, vale o comportamento padrão do PostgreSQL: combinações contendo NULL podem se repetir. A ferramenta registra a proposta, sem executar a restrição no banco.
+
+Para cadastrar um CHECK, marque **CHECK** na coluna e informe apenas a expressão SQL, como `numero >= 1` ou `(ficha_id IS NOT NULL AND organizacao_id IS NULL) OR (ficha_id IS NULL AND organizacao_id IS NOT NULL)`. É possível adicionar, editar e excluir várias restrições na mesma coluna ou tabela. O PostgreSQL rejeita o registro quando uma condição CHECK é FALSE; TRUE e NULL satisfazem a condição, portanto CHECK não substitui NOT NULL e não é uma trigger.
+
+Os CHECKs ficam no JSON de cada coluna como `checks: [{ "expressao": "numero >= 1" }]`. As expressões são preservadas integralmente, inclusive quebras de linha, na edição, importação e restauração local. O TXT documenta todas as restrições da tabela com cláusulas `CHECK (expressão)`, usando o formatador PostgreSQL compartilhado. O modelo atual oferece TXT/JSON, sem exportador SQL completo nem execução ou validação de sintaxe contra um banco. Ao renomear ou excluir colunas, revise manualmente os nomes nas expressões SQL; desmarcar CHECK remove as restrições cadastradas naquela coluna. Modelos antigos sem o campo `checks` continuam sendo importados.
 
 ## Validar
 

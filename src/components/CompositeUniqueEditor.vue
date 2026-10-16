@@ -17,7 +17,7 @@ function save(){
   <div class="composite-unique">
     <button class="btn" :aria-expanded="open" :aria-controls="editorId" @click="open=!open"><Plus :size="14"/> Adicionar composição única</button>
     <p v-if="!groups.length" class="typehelp">Adicione uma combinação para definir a unicidade composta. A coluna não terá UNIQUE individual neste modo.</p>
-    <p v-if="groups.length" class="typehelp">Desmarcar UNIQUE ou UNIQUE composto remove as combinações desta coluna. Sem o modo composto, UNIQUE vale para a coluna individualmente.</p>
+    <p v-if="groups.length" class="typehelp">Desmarcar UNIQUE ou Composto remove as combinações desta coluna. Sem o modo composto, UNIQUE vale para a coluna individualmente.</p>
     <div v-for="group in groups" :key="group.uid" class="unique-group">
       <span>UNIQUE ({{groupColumns(group).map(c=>c.nome).join(', ')}})</span>
       <button class="iconbtn danger" :aria-label="`Remover UNIQUE composto (${groupColumns(group).map(c=>c.nome).join(', ')})`" @click="remove(group.uid)"><Trash2 :size="14"/></button>

@@ -14,6 +14,7 @@ const groupLabel=group=>`UNIQUE composto {${names(group)}}`
   <span v-if="column.fk" class="columnbadge">FK</span>
   <span v-if="!column.nullable" class="columnbadge">NOT NULL</span>
   <span v-if="column.imutavel" class="columnbadge">Imutável</span>
+  <span v-if="column.checks.length" class="columnbadge">CHECK ({{column.checks.length}})</span>
   <span v-if="unique&&!composite" class="columnbadge">UNIQUE</span>
   <span v-for="group in groups" :key="group.uid" class="columnbadge">{{groupLabel(group)}}</span>
   <span v-if="composite&&!groups.length" class="columnbadge">UNIQUE composto (sem composição definida)</span>
