@@ -5,6 +5,8 @@ import TableCombobox from './components/TableCombobox.vue'
 import NameInput from './components/NameInput.vue'
 import CompositeUniqueEditor from './components/CompositeUniqueEditor.vue'
 import ColumnBadges from './components/ColumnBadges.vue'
+import CheckEditor from './components/CheckEditor.vue'
+import { formatCheckSQL } from './checkConstraints.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
 const sortedTables=computed(()=>[...store.doc.tabelas].sort((a,b)=>a.nome.trim().localeCompare(b.nome.trim(),'pt-BR',{sensitivity:'base'})))
@@ -98,6 +100,7 @@ function formatText(d){
     `\nTABELA: ${t.nome}`,
     t.colunas.filter(c=>c.pk).length>1?`Chave primária composta (combinação única): ${t.colunas.filter(c=>c.pk).map(c=>c.nome||'sem_nome').join(', ')}`:'',
     ...t.uniqueCompostos.map(group=>`UNIQUE composto (${group.colunas.join(', ')}): a combinação dos valores não pode se repetir.`),
+    ...t.colunas.flatMap(c=>c.checks.map(check=>`${formatCheckSQL(check.expressao)} — cadastrado em ${c.nome||'sem_nome'}`)),
     ...t.colunas.map(c=>[
       `- ${c.nome||'sem_nome'}: ${c.tipo}${showSize(c.tipo)&&c.tamanho?'('+c.tamanho+(c.tipo==='NUMERIC'&&c.escala?','+c.escala:'')+')':''}`,
       c.pk?'PK':'',c.fk?`FK -> ${c.fkTabela}.${c.fkColuna||'id'}`:'',c.nullable?'NULL':'NOT NULL',
@@ -192,7 +195,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
                 <label class="check"><input v-model="c.nullable" type="checkbox" :disabled="c.pk"/> Permite NULL</label>
                 <label class="check"><input v-model="c.imutavel" type="checkbox" :disabled="c.pk"/> Imutável</label>
                 <label class="check"><input :checked="store.isUniqueEnabled(c)" type="checkbox" :disabled="c.pk && store.primaryKeyColumns.length===1" @change="store.setUnique(c,$event.target.checked)"/> UNIQUE</label>
-                <label v-if="store.isUniqueEnabled(c)&&(!c.pk||store.primaryKeyColumns.length!==1||store.isCompositeUnique(c))" class="check"><input :checked="store.isCompositeUnique(c)" type="checkbox" :disabled="c.pk&&store.primaryKeyColumns.length===1" @change="store.setCompositeUnique(c,$event.target.checked)"/> UNIQUE composto</label>
+                <label v-if="store.isUniqueEnabled(c)&&(!c.pk||store.primaryKeyColumns.length!==1||store.isCompositeUnique(c))" class="check"><input :checked="store.isCompositeUnique(c)" type="checkbox" :disabled="c.pk&&store.primaryKeyColumns.length===1" @change="store.setCompositeUnique(c,$event.target.checked)"/> Composto</label>
+                <label class="check"><input :checked="store.isCheckEnabled(c)" type="checkbox" @change="store.setCheck(c,$event.target.checked)"/> CHECK</label>
                 <label class="check"><input :checked="c.fk" type="checkbox" @change="store.setForeignKey(c,$event.target.checked)"/> <KeyRound :size="14"/> FK</label>
               </div>
             </div>
@@ -204,6 +208,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
             </div>
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3" placeholder="Principal&#10;Direto&#10;Indireto"/></label>
             <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
+            <CheckEditor v-if="store.isCheckEnabled(c)" :column="c" :save="(id,expression)=>store.saveCheck(c,id,expression)" :remove="id=>store.removeCheck(c,id)"/>
             <label>Regra<textarea v-model="c.descricao" rows="2" placeholder="Regra, validação CHECK ou trigger da coluna..."/></label>
           </div>
         </article>

@@ -204,3 +204,65 @@ test('segunda PK é recusada e os presets preservam a PK existente',()=>{
   store.setPrimaryKey(numero,true)
   assert.equal(store.primaryKeyColumns[0].uid,numero.uid)
 })
+
+test('CHECK permite múltiplas expressões e edição sem alterar UNIQUE, PK ou NULL',()=>{
+  const store=parcelas()
+  const column=store.columns[0]
+  store.setUnique(column,true)
+  store.setCheck(column,true)
+  store.saveCheck(column,null,'valor > 0')
+  store.saveCheck(column,null,'numero >= 1')
+  const id=column.checks[0].uid
+  store.saveCheck(column,id,'valor > 10')
+  assert.deepEqual(store.exported.tabelas[0].colunas[0].checks,[{expressao:'valor > 10'},{expressao:'numero >= 1'}])
+  assert.equal(column.unique,true)
+  assert.equal(column.pk,false)
+  assert.equal(column.nullable,false)
+  store.removeCheck(column,id)
+  assert.deepEqual(column.checks.map(c=>c.expressao),['numero >= 1'])
+  store.setCheck(column,false)
+  assert.equal(store.isCheckEnabled(column),false)
+  assert.equal(column.checks.length,0)
+  assert.equal(column.unique,true)
+})
+
+test('CHECK composto mantém SQL multilinha com AND, OR e condições NULL na importação',()=>{
+  const store=parcelas()
+  const expression='(ficha_id IS NOT NULL AND organizacao_id IS NULL)\nOR\n(ficha_id IS NULL AND organizacao_id IS NOT NULL)'
+  store.saveCheck(store.columns[0],null,expression)
+  store.saveCheck(store.columns[1],null,'numero >= 1')
+  const exported=JSON.parse(JSON.stringify(store.exported))
+  store.importData(exported)
+  assert.deepEqual(store.exported,exported)
+  assert.equal(store.columns[0].checks[0].expressao,expression)
+  assert.equal(store.isCheckEnabled(store.columns[0]),true)
+  const saved=JSON.stringify(store.doc)
+  globalThis.localStorage.getItem=()=>saved
+  setActivePinia(createPinia())
+  assert.deepEqual(useModelStore().exported,exported)
+})
+
+test('CHECK recusa expressão vazia e importação inválida preserva o documento atual',()=>{
+  const store=parcelas()
+  const column=store.columns[0]
+  for(const expr of ['', '  ', null, {}])assert.throws(()=>store.saveCheck(column,null,expr),/expressão SQL/)
+  assert.equal(column.checks.length,0)
+  const original=store.doc
+  const data=JSON.parse(JSON.stringify(store.exported))
+  data.tabelas[0].colunas[0].checks=[{expressao:' '}]
+  assert.throws(()=>store.importData(data),/expressão SQL/)
+  assert.equal(store.doc,original)
+  data.tabelas[0].colunas[0].checks='numero > 0'
+  assert.throws(()=>store.importData(data),/Lista de restrições/)
+  assert.equal(store.doc,original)
+})
+
+test('modelos antigos sem CHECK continuam importando e CHECK convive com composição',()=>{
+  const store=parcelas()
+  assert.ok(store.columns.every(c=>c.checks.length===0))
+  store.addCompositeUnique(store.columns.slice(0,2).map(c=>c.uid))
+  store.saveCheck(store.columns[1],null,'numero >= 1')
+  assert.deepEqual(store.exported.tabelas[0].uniqueCompostos,[{colunas:['financeiro_id','numero']}])
+  assert.equal(store.exported.tabelas[0].colunas[1].checks[0].expressao,'numero >= 1')
+  assert.equal(store.exported.tabelas[0].colunas[1].unique,false)
+})

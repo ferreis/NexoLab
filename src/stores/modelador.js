@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { availableName, duplicateNameError, nameConflict } from '../modelNames.js'
 import { convertGroups, groupKey, validateGroup } from '../compositeUnique.js'
+import { checkExpression, convertChecks } from '../checkConstraints.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -22,7 +23,7 @@ export const TYPES = [
   ['TEXT[]','Lista de textos.']
 ]
 const makeId=()=>crypto.randomUUID()
-export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:''})
+export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,checkEnabled:false,checks:[],fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:''})
 export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
 const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
@@ -37,6 +38,7 @@ function convertColumn(c){
   const updateRule='Atualizar com a data e hora atuais a cada alteração do registro.'
   return {
     ...makeColumn(),...fields,...(c.pk?{imutavel:true,nullable:false}:{}),uid:c.uid||makeId(),padrao:String(c.padrao??c.default??''),fk:!!(c.fk||c.fkTabela),
+    checks:convertChecks(c.checks),
     descricao:atualizarAoAlterar&&!/a cada alteração/i.test(description)?[description,updateRule].filter(Boolean).join('\n'):description,
     enumValores:Array.isArray(c.enumValores)?c.enumValores:c.enumValores?.split(/[,\n]/).map(v=>v.trim()).filter(Boolean)||[]
   }
@@ -88,6 +90,22 @@ export const useModelStore=defineStore('modelador',()=>{
   const isUnique=c=>c.unique||(c.pk&&primaryKeyColumns.value.length===1)
   const isCompositeUnique=c=>c.uniqueComposto||selected.value?.uniqueCompostos.some(group=>group.colunas.includes(c.uid))||false
   const isUniqueEnabled=c=>isUnique(c)||isCompositeUnique(c)
+  const isCheckEnabled=c=>c.checkEnabled||c.checks.length>0
+  function setCheck(column,enabled){
+    column.checkEnabled=enabled
+    if(!enabled)column.checks=[]
+  }
+  function saveCheck(column,id,expression){
+    if(!selected.value?.colunas.includes(column))return
+    const expressao=checkExpression(expression)
+    if(id){
+      const check=column.checks.find(check=>check.uid===id)
+      if(!check)throw new Error('Esta restrição CHECK não existe mais.')
+      check.expressao=expressao
+    }else column.checks.push({uid:makeId(),expressao})
+    column.checkEnabled=true
+  }
+  function removeCheck(column,id){column.checks=column.checks.filter(check=>check.uid!==id)}
   function clearColumnGroups(column){selected.value.uniqueCompostos=selected.value.uniqueCompostos.filter(group=>!group.colunas.includes(column.uid))}
   function setUnique(column,enabled){
     if(column.pk&&primaryKeyColumns.value.length===1)return
@@ -167,7 +185,7 @@ export const useModelStore=defineStore('modelador',()=>{
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
     tabelas:doc.value.tabelas.map(t=>({nome:t.nome,
       uniqueCompostos:t.uniqueCompostos.map(group=>({colunas:group.colunas.map(id=>t.colunas.find(c=>c.uid===id).nome)})),
-      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,...c})=>({...c,...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
+      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,checks:checks.map(({expressao})=>({expressao})),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported,addCompositeUnique,removeCompositeUnique}
+  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported,addCompositeUnique,removeCompositeUnique}
 })
