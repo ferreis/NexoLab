@@ -91,7 +91,7 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 .cardtoggle > svg { color: #95a4bc; flex-shrink: 0; }
 .cardtoggle strong { overflow-wrap: anywhere; font-size: 14px; font-weight: 600; }
 .cardtoggle small { color: #a8bad3; font: 11px ui-monospace, monospace; }
-.columnbadge { color: #c7b9ff; font-size: 10px; font-weight: 500; padding: 3px 6px; background: #302940; border-radius: 4px; }
+.columnbadge { color: #c7b9ff; font-size: 10px; font-weight: 500; padding: 3px 6px; background: #302940; border-radius: 4px; max-width: 100%; overflow-wrap: anywhere; }
 .columnbody { border-top: 1px solid var(--line); padding: 18px; display: grid; gap: 18px; }
 .column-options { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; }
 .column-options .defaultsrow { flex: 1 1 260px; grid-template-columns: minmax(0, 1fr); }
