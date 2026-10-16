@@ -70,6 +70,8 @@ button, input, textarea, select { transition: border-color .15s, background-colo
 .columnsheading { margin: 28px 0 16px; border-top: 1px solid var(--line); padding-top: 22px; }
 .subtle { color: #8393ab; font-weight: 400; }
 .formgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.name-error { display: block; margin: 8px 0; color: #ffb4b4; font-size: 12px; line-height: 1.5; }
+input[aria-invalid=true] { border-color: #f28484; }
 .fields3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .fields2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .formgrid label, .columnbody label, .sidebar label { display: block; color: #b2bfd2; font-size: 12px; font-weight: 500; min-width: 0; }

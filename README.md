@@ -38,8 +38,11 @@ Ao marcar PK, o modelador exige imutabilidade e NOT NULL. Uma PK de uma coluna t
 ## Validar
 
 ```bash
+npm test
 npm run build
 ```
+
+Nomes de tabelas devem ser únicos no projeto; nomes de colunas devem ser únicos dentro de cada tabela. A comparação ignora maiúsculas/minúsculas e espaços nas pontas. Nomes repetidos são rejeitados ao sair do campo ou pressionar Enter, mantendo o nome anterior. Importações com duplicatas são recusadas. Projetos antigos com duplicatas continuam disponíveis para correção, com exportação e cópia bloqueadas até resolver os conflitos.
 
 ## Hospedagem no Cloudflare
 
