@@ -22,7 +22,7 @@ export const TYPES = [
   ['TEXT[]','Lista de textos.']
 ]
 const makeId=()=>crypto.randomUUID()
-export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:''})
+export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:''})
 export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
 const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
@@ -86,6 +86,20 @@ export const useModelStore=defineStore('modelador',()=>{
   const columns=computed(()=>selected.value?orderColumns(selected.value.colunas):[])
   const primaryKeyColumns=computed(()=>selected.value?.colunas.filter(c=>c.pk)||[])
   const isUnique=c=>c.unique||(c.pk&&primaryKeyColumns.value.length===1)
+  const isCompositeUnique=c=>c.uniqueComposto||selected.value?.uniqueCompostos.some(group=>group.colunas.includes(c.uid))||false
+  const isUniqueEnabled=c=>isUnique(c)||isCompositeUnique(c)
+  function clearColumnGroups(column){selected.value.uniqueCompostos=selected.value.uniqueCompostos.filter(group=>!group.colunas.includes(column.uid))}
+  function setUnique(column,enabled){
+    if(column.pk&&primaryKeyColumns.value.length===1)return
+    column.unique=enabled
+    if(!enabled){column.uniqueComposto=false;clearColumnGroups(column)}
+  }
+  function setCompositeUnique(column,enabled){
+    if(column.pk&&primaryKeyColumns.value.length===1)return
+    column.uniqueComposto=enabled
+    column.unique=!enabled
+    if(!enabled)clearColumnGroups(column)
+  }
   function useDefaultKeyType(column){
     column.tipo='BIGINT'
     column.tamanho=''
@@ -93,6 +107,7 @@ export const useModelStore=defineStore('modelador',()=>{
     column.enumValores=[]
   }
   function setPrimaryKey(column,enabled){
+    if(enabled&&!column.pk&&primaryKeyColumns.value.length)throw new Error('A tabela já possui uma chave primária.')
     column.pk=enabled
     if(enabled){useDefaultKeyType(column);column.imutavel=true;column.nullable=false}
   }
@@ -117,7 +132,10 @@ export const useModelStore=defineStore('modelador',()=>{
       {nome:'criado_em',tipo:'TIMESTAMPTZ',nullable:false,padrao:'now()',imutavel:true,descricao:'Preenchido na criação do registro. Imutável após o primeiro preenchimento.'},
       {nome:'atualizado_em',tipo:'TIMESTAMPTZ',nullable:false,padrao:'now()',descricao:'Preenchido na criação e atualizado automaticamente a cada alteração do registro.'}
     ]
-    for(const p of presets)if(!t.colunas.some(c=>c.nome.trim().toLowerCase()===p.nome))t.colunas.push({...makeColumn(),...p})
+    for(const p of presets){
+      if(p.pk&&t.colunas.some(c=>c.pk))continue
+      if(!t.colunas.some(c=>c.nome.trim().toLowerCase()===p.nome))t.colunas.push({...makeColumn(),...p})
+    }
     t.colunas=orderColumns(t.colunas)
   }
   function moveColumn(id,targetId,after=false){
@@ -149,7 +167,7 @@ export const useModelStore=defineStore('modelador',()=>{
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
     tabelas:doc.value.tabelas.map(t=>({nome:t.nome,
       uniqueCompostos:t.uniqueCompostos.map(group=>({colunas:group.colunas.map(id=>t.colunas.find(c=>c.uid===id).nome)})),
-      colunas:orderColumns(t.colunas).map(({uid,...c})=>({...c,...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
+      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,...c})=>({...c,...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported,addCompositeUnique,removeCompositeUnique}
+  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported,addCompositeUnique,removeCompositeUnique}
 })

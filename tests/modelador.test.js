@@ -157,3 +157,50 @@ test('importação recusa UNIQUE composto inválido sem substituir o documento',
   assert.throws(()=>store.importData(data),/já possui/)
   assert.equal(store.doc,original)
 })
+
+test('UNIQUE composto substitui unicidade individual no fluxo de opções',()=>{
+  const store=parcelas()
+  const [financeiro,numero]=store.columns
+  assert.equal(store.isUniqueEnabled(numero),false)
+  store.setUnique(numero,true)
+  assert.equal(store.isUnique(numero),true)
+  store.setCompositeUnique(numero,true)
+  assert.equal(store.isUnique(numero),false)
+  assert.equal(store.isUniqueEnabled(numero),true)
+  assert.equal(store.isCompositeUnique(numero),true)
+  store.addCompositeUnique([numero.uid,financeiro.uid])
+  assert.equal(store.isUniqueEnabled(financeiro),true)
+  assert.equal(store.isCompositeUnique(financeiro),true)
+  assert.equal(store.exported.tabelas[0].colunas.find(c=>c.nome==='numero').unique,false)
+  store.setCompositeUnique(numero,false)
+  assert.equal(store.isUnique(numero),true)
+  assert.equal(store.selected.uniqueCompostos.length,0)
+  store.setUnique(numero,false)
+  assert.equal(store.isUniqueEnabled(numero),false)
+})
+
+test('desmarcar UNIQUE remove as composições da coluna e preserva outras',()=>{
+  const store=parcelas()
+  const [financeiro,numero,referencia]=store.columns
+  store.setUnique(numero,true);store.setCompositeUnique(numero,true)
+  store.addCompositeUnique([numero.uid,financeiro.uid])
+  store.addCompositeUnique([financeiro.uid,referencia.uid])
+  store.setUnique(numero,false)
+  assert.equal(store.isCompositeUnique(numero),false)
+  assert.deepEqual(store.exported.tabelas[0].uniqueCompostos,[{colunas:['financeiro_id','referencia']}])
+})
+
+test('segunda PK é recusada e os presets preservam a PK existente',()=>{
+  const store=parcelas()
+  const [financeiro,numero]=store.columns
+  store.setPrimaryKey(financeiro,true)
+  assert.throws(()=>store.setPrimaryKey(numero,true),/já possui uma chave primária/)
+  assert.equal(numero.pk,false)
+  store.addDefaults()
+  assert.equal(store.primaryKeyColumns.length,1)
+  assert.equal(store.primaryKeyColumns[0].uid,financeiro.uid)
+  assert.ok(store.columns.some(c=>c.nome==='criado_em'))
+  store.setPrimaryKey(financeiro,false)
+  store.setPrimaryKey(numero,true)
+  assert.equal(store.primaryKeyColumns[0].uid,numero.uid)
+})

@@ -187,10 +187,11 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
                 <label v-if="!c.pk&&!c.fk">Valor padrão na criação<input v-model="c.padrao" placeholder="Sem padrão definido"/><span class="fieldhelp">Usado ao criar o registro quando o valor não é informado. Ex.: now(), 0, FALSE.</span></label>
               </div>
               <div class="checkrow">
-                <label class="check"><input :checked="c.pk" type="checkbox" @change="store.setPrimaryKey(c,$event.target.checked)"/> <KeyRound :size="14"/> PK</label>
+                <label v-if="c.pk||!store.primaryKeyColumns.length" class="check"><input :checked="c.pk" type="checkbox" @change="store.setPrimaryKey(c,$event.target.checked)"/> <KeyRound :size="14"/> PK</label>
                 <label class="check"><input v-model="c.nullable" type="checkbox" :disabled="c.pk"/> Permite NULL</label>
                 <label class="check"><input v-model="c.imutavel" type="checkbox" :disabled="c.pk"/> Imutável</label>
-                <label class="check"><input :checked="store.isUnique(c)" type="checkbox" :disabled="c.pk && store.primaryKeyColumns.length===1" @change="c.unique=$event.target.checked"/> UNIQUE</label>
+                <label class="check"><input :checked="store.isUniqueEnabled(c)" type="checkbox" :disabled="c.pk && store.primaryKeyColumns.length===1" @change="store.setUnique(c,$event.target.checked)"/> UNIQUE</label>
+                <label v-if="store.isUniqueEnabled(c)&&(!c.pk||store.primaryKeyColumns.length!==1||store.isCompositeUnique(c))" class="check"><input :checked="store.isCompositeUnique(c)" type="checkbox" :disabled="c.pk&&store.primaryKeyColumns.length===1" @change="store.setCompositeUnique(c,$event.target.checked)"/> UNIQUE composto</label>
                 <label class="check"><input :checked="c.fk" type="checkbox" @change="store.setForeignKey(c,$event.target.checked)"/> <KeyRound :size="14"/> FK</label>
               </div>
             </div>
@@ -201,7 +202,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               <label>Coluna referenciada<input v-model="c.fkColuna" placeholder="id"/></label>
             </div>
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3" placeholder="Principal&#10;Direto&#10;Indireto"/></label>
-            <CompositeUniqueEditor :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
+            <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
             <label>Regra<textarea v-model="c.descricao" rows="2" placeholder="Regra, validação CHECK ou trigger da coluna..."/></label>
           </div>
         </article>
