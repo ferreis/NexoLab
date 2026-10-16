@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from 'vue'
 import { useModelStore, TYPES, isDefaultColumn } from './stores/modelador'
 import TableCombobox from './components/TableCombobox.vue'
 import NameInput from './components/NameInput.vue'
+import CompositeUniqueEditor from './components/CompositeUniqueEditor.vue'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
 const sortedTables=computed(()=>[...store.doc.tabelas].sort((a,b)=>a.nome.trim().localeCompare(b.nome.trim(),'pt-BR',{sensitivity:'base'})))
@@ -95,6 +96,7 @@ function formatText(d){
   return [`Projeto: ${d.projeto}\nSchema: ${d.schema_alvo}\n`,...d.tabelas.map(t=>[
     `\nTABELA: ${t.nome}`,
     t.colunas.filter(c=>c.pk).length>1?`Chave primária composta (combinação única): ${t.colunas.filter(c=>c.pk).map(c=>c.nome||'sem_nome').join(', ')}`:'',
+    ...t.uniqueCompostos.map(group=>`UNIQUE composto (${group.colunas.join(', ')}): a combinação dos valores não pode se repetir.`),
     ...t.colunas.map(c=>[
       `- ${c.nome||'sem_nome'}: ${c.tipo}${showSize(c.tipo)&&c.tamanho?'('+c.tamanho+(c.tipo==='NUMERIC'&&c.escala?','+c.escala:'')+')':''}`,
       c.pk?'PK':'',c.fk?`FK -> ${c.fkTabela}.${c.fkColuna||'id'}`:'',c.nullable?'NULL':'NOT NULL',
@@ -123,6 +125,7 @@ async function confirmDelete(){
   }
 }
 function help(t){helpType.value=helpType.value===t?'':t}
+function removeColumn(id){if(store.removeColumn(id))toast('Coluna excluída. As combinações UNIQUE que a utilizavam também foram removidas.')}
 function toggleCard(id){const next=new Set(collapsed.value);next.has(id)?next.delete(id):next.add(id);collapsed.value=next}
 function enumText(c){return c.enumValores.join('\n')}
 function setEnum(c,str){c.enumValores=str.split(/[,\n]/).map(s=>s.trim()).filter(Boolean)}
@@ -168,7 +171,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div v-if="!store.selected.colunas.length" class="empty">Nenhuma coluna cadastrada. Use <strong>ID e datas padrão</strong> ou adicione uma coluna.</div>
         <p id="reorder-help" class="sr-only">Arraste pela alça para reordenar, ou use as setas para cima e para baixo com a alça em foco. ID e datas permanecem fixos.</p>
         <article v-for="c in store.columns" :key="c.uid" class="columncard" :class="{dragging:dragged?.id===c.uid,'drop-before':dropTarget?.id===c.uid&&!dropTarget.after,'drop-after':dropTarget?.id===c.uid&&dropTarget.after}" @dragover="dragOver($event,c)" @drop="dropColumn($event,c)">
-          <div class="columnhead"><button v-if="!isDefaultColumn(c)" class="drag-handle" draggable="true" :aria-label="`Reordenar coluna ${c.nome||'sem nome'}`" aria-describedby="reorder-help" title="Arrastar para reordenar · ↑ ↓ pelo teclado" @dragstart="startDrag($event,c)" @dragend="endDrag" @keydown="moveWithKeyboard($event,c)"><GripVertical :size="17"/></button><button class="cardtoggle" :aria-expanded="!collapsed.has(c.uid)" @click="toggleCard(c.uid)"><ChevronDown v-if="!collapsed.has(c.uid)" :size="16"/><ChevronUp v-else :size="16"/><strong>{{c.nome||'Nova coluna'}}</strong> <small>{{c.tipo}}</small><span v-if="c.pk" class="columnbadge">PK</span><span v-if="c.imutavel" class="columnbadge">Imutável</span></button><button class="iconbtn danger" title="Excluir coluna" @click="store.removeColumn(c.uid)"><Trash2 :size="16"/></button></div>
+          <div class="columnhead"><button v-if="!isDefaultColumn(c)" class="drag-handle" draggable="true" :aria-label="`Reordenar coluna ${c.nome||'sem nome'}`" aria-describedby="reorder-help" title="Arrastar para reordenar · ↑ ↓ pelo teclado" @dragstart="startDrag($event,c)" @dragend="endDrag" @keydown="moveWithKeyboard($event,c)"><GripVertical :size="17"/></button><button class="cardtoggle" :aria-expanded="!collapsed.has(c.uid)" @click="toggleCard(c.uid)"><ChevronDown v-if="!collapsed.has(c.uid)" :size="16"/><ChevronUp v-else :size="16"/><strong>{{c.nome||'Nova coluna'}}</strong> <small>{{c.tipo}}</small><span v-if="c.pk" class="columnbadge">PK</span><span v-if="c.imutavel" class="columnbadge">Imutável</span><span v-if="store.selected.uniqueCompostos.some(group=>group.colunas.includes(c.uid))" class="columnbadge">UNIQUE composto</span></button><button class="iconbtn danger" title="Excluir coluna" @click="removeColumn(c.uid)"><Trash2 :size="16"/></button></div>
           <div v-if="!collapsed.has(c.uid)" class="columnbody">
             <div class="fields3" :class="{fields2:!showSize(c.tipo)}">
               <label>Nome<NameInput label="Nome" :model-value="c.nome" :commit="name=>store.renameColumn(c,name)" placeholder="ex.: ficha_id"/></label>
@@ -198,6 +201,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               <label>Coluna referenciada<input v-model="c.fkColuna" placeholder="id"/></label>
             </div>
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3" placeholder="Principal&#10;Direto&#10;Indireto"/></label>
+            <CompositeUniqueEditor :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
             <label>Regra<textarea v-model="c.descricao" rows="2" placeholder="Regra, validação CHECK ou trigger da coluna..."/></label>
           </div>
         </article>

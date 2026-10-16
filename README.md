@@ -28,12 +28,17 @@ Abra o endereço mostrado pelo Vite (normalmente `http://localhost:5173`).
 - Exportação TXT/JSON e importação do JSON da ferramenta HTML anterior.
 - Persistência automática local via `localStorage`.
 - Regras de negócio, validações e triggers no campo Regra de cada coluna.
+- UNIQUE composto configurado dentro das colunas, com seleção das demais colunas da combinação e exportação em TXT/JSON.
 
 **Não se conecta ao Supabase e não executa SQL.** O JSON é uma proposta para revisão.
 
 Os presets são exibidos fechados: `id` sempre no início, `criado_em` e `atualizado_em` no fim. Novas colunas entram no meio. Nos presets, `id` e `criado_em` são imutáveis após o primeiro preenchimento; as datas recebem `now()` na criação. A atualização de `atualizado_em` fica descrita nas regras da coluna. Essas regras integram a proposta, a implementar no banco ou na aplicação. Ao abrir ou importar modelos antigos, automações da tabela são incorporadas às regras e a antiga opção de atualização de datas é preservada como texto nas observações da coluna.
 
 Ao marcar PK, o modelador exige imutabilidade e NOT NULL. Uma PK de uma coluna também marca UNIQUE automaticamente. Se várias colunas forem marcadas como PK, elas formam uma única chave composta: a unicidade vale para a combinação, e UNIQUE individual continua opcional. Desmarcar PK mantém as opções explícitas de imutabilidade e nulidade para revisão. FK, por si só, permite valores repetidos. A imutabilidade é uma regra desta ferramenta, não uma restrição implícita de PK no PostgreSQL.
+
+Para números de parcelas únicos por financeiro, abra uma das colunas, clique em **UNIQUE composto**, selecione a outra coluna e adicione a combinação `(financeiro_id, numero)`. Assim, `(1, 6)` e `(2, 6)` são permitidos, mas duas ocorrências de `(1, 6)` são rejeitadas quando a restrição for implementada no banco. Não marque UNIQUE individual se cada valor puder se repetir fora da combinação. As colunas não precisam ser FKs para participar.
+
+O JSON inclui `uniqueCompostos: [{ "colunas": ["financeiro_id", "numero"] }]` em cada tabela; o TXT descreve a mesma combinação. Os grupos acompanham renomeações e reordenações, são restaurados ao importar e aparecem nas colunas participantes. Excluir uma coluna remove as combinações inteiras que dependiam dela. Se Permite NULL estiver marcado, vale o comportamento padrão do PostgreSQL: combinações contendo NULL podem se repetir. A ferramenta registra a proposta, sem executar a restrição no banco.
 
 ## Validar
 

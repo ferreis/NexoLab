@@ -86,3 +86,74 @@ test('presets e novas colunas não criam nomes repetidos',()=>{
   assert.equal(store.nameError,'')
   assert.throws(()=>store.renameColumn(store.columns.find(c=>!c.nome),' ID '),/Já existe uma coluna/)
 })
+
+function parcelas(){
+  const store=useModelStore()
+  store.importData({tabelas:[{nome:'financeiro_parcelas',colunas:[{nome:'financeiro_id',tipo:'BIGINT',fk:true,fkTabela:'financeiro'},{nome:'numero',tipo:'SMALLINT'},{nome:'referencia',tipo:'TEXT'}]}]})
+  return store
+}
+
+test('UNIQUE composto exporta a combinação sem impor UNIQUE individual ou PK',()=>{
+  const store=parcelas()
+  const ids=store.columns.slice(0,2).map(c=>c.uid)
+  store.addCompositeUnique(ids)
+  assert.deepEqual(store.exported.tabelas[0].uniqueCompostos,[{colunas:['financeiro_id','numero']}])
+  assert.ok(store.columns.every(c=>!c.unique&&!c.pk))
+  assert.throws(()=>store.addCompositeUnique([...ids].reverse()),/já possui/)
+})
+
+test('UNIQUE composto rejeita grupos incompletos, colunas repetidas ou de outra tabela',()=>{
+  const store=parcelas()
+  const id=store.columns[0].uid
+  for(const ids of [[],[id],[id,id],[id,'outra-tabela']])assert.throws(()=>store.addCompositeUnique(ids))
+  store.addColumn()
+  assert.throws(()=>store.addCompositeUnique([id,store.columns.find(c=>!c.nome).uid]),/com nome/)
+  assert.equal(store.selected.uniqueCompostos.length,0)
+})
+
+test('renomear e reordenar colunas preserva os vínculos do UNIQUE composto',()=>{
+  const store=parcelas()
+  const [financeiro,numero,referencia]=store.columns
+  store.addCompositeUnique([financeiro.uid,numero.uid])
+  store.renameColumn(numero,'parcela')
+  store.moveColumn(numero.uid,referencia.uid,true)
+  assert.deepEqual(store.exported.tabelas[0].uniqueCompostos[0].colunas,['financeiro_id','parcela'])
+  assert.throws(()=>store.renameColumn(numero,''),/precisa manter um nome/)
+  store.removeCompositeUnique(store.selected.uniqueCompostos[0].uid)
+  store.renameColumn(numero,'')
+  assert.equal(numero.nome,'')
+})
+
+test('excluir coluna remove suas combinações inteiras e preserva grupos independentes',()=>{
+  const store=parcelas()
+  const [financeiro,numero,referencia]=store.columns
+  store.addCompositeUnique([financeiro.uid,numero.uid])
+  store.addCompositeUnique([numero.uid,referencia.uid])
+  assert.equal(store.removeColumn(financeiro.uid),1)
+  assert.deepEqual(store.exported.tabelas[0].uniqueCompostos,[{colunas:['numero','referencia']}])
+})
+
+test('UNIQUE composto sobrevive à exportação/importação e à restauração local',()=>{
+  const store=parcelas()
+  store.addCompositeUnique(store.columns.slice(0,2).map(c=>c.uid))
+  const exported=JSON.parse(JSON.stringify(store.exported))
+  store.importData(exported)
+  assert.deepEqual(store.exported,exported)
+  const saved=JSON.stringify(store.doc)
+  globalThis.localStorage.getItem=()=>saved
+  setActivePinia(createPinia())
+  const restored=useModelStore()
+  assert.deepEqual(restored.exported,exported)
+})
+
+test('importação recusa UNIQUE composto inválido sem substituir o documento',()=>{
+  const store=parcelas()
+  const original=store.doc
+  const data=JSON.parse(JSON.stringify(store.exported))
+  data.tabelas[0].uniqueCompostos=[{colunas:['numero','inexistente']}]
+  assert.throws(()=>store.importData(data),/existentes/)
+  assert.equal(store.doc,original)
+  data.tabelas[0].uniqueCompostos=[{colunas:['financeiro_id','numero']},{colunas:['numero','financeiro_id']}]
+  assert.throws(()=>store.importData(data),/já possui/)
+  assert.equal(store.doc,original)
+})
