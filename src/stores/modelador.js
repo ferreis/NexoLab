@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { availableName, duplicateNameError, nameConflict } from '../modelNames.js'
+import { convertGroups, groupKey, validateGroup } from '../compositeUnique.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -22,7 +23,7 @@ export const TYPES = [
 ]
 const makeId=()=>crypto.randomUUID()
 export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:''})
-export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',finalidade:'',regras:'',colunas:[]})
+export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
 const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
 export const isDefaultColumn=c=>['id','criado_em','atualizado_em'].includes(columnName(c))
@@ -42,11 +43,13 @@ function convertColumn(c){
 }
 function convert(input){
   if (!input || !Array.isArray(input.tabelas)) throw new Error('Arquivo sem a lista de tabelas')
-  return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),tabelas:input.tabelas.map(t=>({
+  return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),tabelas:input.tabelas.map(t=>{
+    const colunas=orderColumns((t.colunas||[]).map(convertColumn))
+    return {
     uid:t.uid||makeId(),nome:String(t.nome||''),finalidade:String(t.finalidade??t.descricao??''),
     regras:[String(t.regras??t.observacoes??''),t.automacoes?`Triggers e funções:\n${t.automacoes}`:''].filter(Boolean).join('\n\n'),
-    colunas:orderColumns((t.colunas||[]).map(convertColumn))
-  }))}
+    colunas,uniqueCompostos:convertGroups(t.uniqueCompostos,colunas)
+  }})}
 }
 export const useModelStore=defineStore('modelador',()=>{
   let saved
@@ -65,8 +68,19 @@ export const useModelStore=defineStore('modelador',()=>{
   }
   function renameColumn(column,name){
     if(!selected.value?.colunas.includes(column))return
+    if(!name.trim()&&selected.value.uniqueCompostos.some(group=>group.colunas.includes(column.uid)))throw new Error('Esta coluna participa de um UNIQUE composto e precisa manter um nome.')
     if(nameConflict(selected.value.colunas,name,column))throw new Error(`Já existe uma coluna com o nome “${name.trim()}” nesta tabela. O nome anterior foi mantido.`)
     column.nome=name.trim()
+  }
+  function addCompositeUnique(ids){
+    const table=selected.value
+    if(!table)return
+    validateGroup(ids,table.colunas)
+    if(table.uniqueCompostos.some(group=>groupKey(group.colunas)===groupKey(ids)))throw new Error('Esta combinação de colunas já possui UNIQUE composto.')
+    table.uniqueCompostos.push({uid:makeId(),colunas:[...ids]})
+  }
+  function removeCompositeUnique(id){
+    if(selected.value)selected.value.uniqueCompostos=selected.value.uniqueCompostos.filter(group=>group.uid!==id)
   }
   function removeTable(){doc.value.tabelas=doc.value.tabelas.filter(t=>t.uid!==selectedId.value);selectedId.value=doc.value.tabelas[0]?.uid||null}
   const columns=computed(()=>selected.value?orderColumns(selected.value.colunas):[])
@@ -89,7 +103,8 @@ export const useModelStore=defineStore('modelador',()=>{
   function setForeignTable(column,tableName){
     const previous=column.fkTabela.trim()
     if(!column.nome.trim()||(previous&&column.nome===`${previous}_id`)){
-      column.nome=tableName.trim()?availableName(selected.value.colunas,`${tableName.trim()}_id`,column):''
+      const name=tableName.trim()?availableName(selected.value.colunas,`${tableName.trim()}_id`,column):''
+      if(name||!selected.value.uniqueCompostos.some(group=>group.colunas.includes(column.uid)))renameColumn(column,name)
     }
     column.fkTabela=tableName
   }
@@ -115,7 +130,14 @@ export const useModelStore=defineStore('modelador',()=>{
     table.colunas=orderColumns(next)
     return true
   }
-  function removeColumn(id){if(selected.value)selected.value.colunas=selected.value.colunas.filter(c=>c.uid!==id)}
+  function removeColumn(id){
+    if(!selected.value)return 0
+    const table=selected.value
+    const removed=table.uniqueCompostos.filter(group=>group.colunas.includes(id)).length
+    table.uniqueCompostos=table.uniqueCompostos.filter(group=>!group.colunas.includes(id))
+    table.colunas=table.colunas.filter(c=>c.uid!==id)
+    return removed
+  }
   function importData(data){
     const imported=convert(data)
     const error=duplicateNameError(imported.tabelas)
@@ -126,7 +148,8 @@ export const useModelStore=defineStore('modelador',()=>{
   const exported=computed(()=>({
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
     tabelas:doc.value.tabelas.map(t=>({nome:t.nome,
+      uniqueCompostos:t.uniqueCompostos.map(group=>({colunas:group.colunas.map(id=>t.colunas.find(c=>c.uid===id).nome)})),
       colunas:orderColumns(t.colunas).map(({uid,...c})=>({...c,...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported}
+  return {doc,selectedId,selected,columns,primaryKeyColumns,isUnique,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported,addCompositeUnique,removeCompositeUnique}
 })
