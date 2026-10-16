@@ -49,7 +49,7 @@ Os CHECKs ficam no JSON de cada coluna como `checks: [{ "expressao": "numero >= 
 
 No modo **SQL**, cole uma expressão ou `CHECK (...)` e clique em **Converter para seleções**. A conversão suporta parênteses, AND/OR, comparações (`=`, `<>`, `!=`, `>`, `>=`, `<`, `<=`), números, textos entre aspas simples, TRUE/FALSE, comparação entre colunas e IS NULL/IS NOT NULL, respeitando a precedência de AND sobre OR. Identificadores entre aspas duplas preservam a caixa; nomes sem aspas são convertidos para minúsculas como no PostgreSQL. Funções, casts, subconsultas e outros recursos fora desse subconjunto permanecem no modo SQL, com mensagem explicativa e o texto original preservado. A conversão não executa SQL. Expressões que permanecerem livres continuam exigindo revisão manual ao renomear ou excluir colunas.
 
-O TXT documenta todas as restrições da tabela com cláusulas `CHECK (expressão)`, usando o formatador PostgreSQL compartilhado. O modelo atual oferece TXT/JSON, sem exportador SQL completo nem execução ou validação de sintaxe contra um banco. Desmarcar CHECK remove as restrições cadastradas naquela coluna. Modelos antigos sem o campo `checks` continuam sendo importados.
+O TXT documenta UNIQUE individual e UNIQUE composto na linha de cada coluna envolvida, e os CHECKs logo abaixo da coluna em que foram cadastrados, com recuo. Prévia, cópia e download usam essa mesma formatação, com cláusulas `CHECK (expressão)` do formatador PostgreSQL compartilhado. O modelo atual oferece TXT/JSON, sem exportador SQL completo nem execução ou validação de sintaxe contra um banco. Desmarcar CHECK remove as restrições cadastradas naquela coluna. Modelos antigos sem o campo `checks` continuam sendo importados.
 
 ## Validar
 
