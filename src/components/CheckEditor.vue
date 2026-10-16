@@ -1,13 +1,18 @@
 <script setup>
-import { ref, useId } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { formatCheckSQL } from '../checkConstraints.js'
+import { makeCheckBuilder, cloneBuilder, compileCheckBuilder } from '../checkBuilder.js'
+import CheckBuilder from './CheckBuilder.vue'
 
-const props=defineProps({column:{type:Object,required:true},save:{type:Function,required:true},remove:{type:Function,required:true}})
+const props=defineProps({column:{type:Object,required:true},columns:{type:Array,required:true},save:{type:Function,required:true},remove:{type:Function,required:true}})
 const open=ref(!props.column.checks.length), expression=ref(''), editingId=ref(null), error=ref(''), inputId=useId()
-function edit(check){editingId.value=check?.uid||null;expression.value=check?.expressao||'';error.value='';open.value=true}
+const advanced=ref(false), builder=ref(makeCheckBuilder(props.column))
+const preview=computed(()=>{try{return {sql:compileCheckBuilder(builder.value,props.columns),error:''}}catch(err){return {sql:'',error:err.message}}})
+function edit(check){editingId.value=check?.uid||null;expression.value=check?.expressao||'';builder.value=check?.construtor?cloneBuilder(check.construtor):makeCheckBuilder(props.column);advanced.value=!!check&&!check.construtor;error.value='';open.value=true}
+function switchMode(value){if(value&&!advanced.value)expression.value=preview.value.sql;advanced.value=value;error.value=''}
 function submit(){
-  try{props.save(editingId.value,expression.value);expression.value='';editingId.value=null;error.value='';open.value=false}
+  try{props.save(editingId.value,advanced.value?expression.value:preview.value.sql,advanced.value?null:builder.value);expression.value='';editingId.value=null;error.value='';open.value=false}
   catch(err){error.value=err.message}
 }
 function removeCheck(id){props.remove(id);if(editingId.value===id){open.value=false;editingId.value=null;expression.value=''}}
@@ -24,12 +29,20 @@ function removeCheck(id){props.remove(id);if(editingId.value===id){open.value=fa
       </div>
     </div>
     <button class="btn" :aria-expanded="open" :aria-controls="inputId" @click="edit()"><Plus :size="14"/>Adicionar CHECK</button>
-    <div v-if="open" class="check-form">
-      <label :for="inputId">Expressão SQL do CHECK</label>
-      <textarea :id="inputId" v-model="expression" rows="4" placeholder="valor > 0 ou numero >= 1" :aria-invalid="!!error" :aria-describedby="error?`${inputId}-error`:`${inputId}-help`" @input="error=''"/>
-      <p :id="`${inputId}-help`" class="fieldhelp">Informe somente a expressão, sem CHECK (...). Pode usar AND, OR, IS NULL e IS NOT NULL. Ao renomear ou excluir colunas, revise os nomes usados nas expressões.</p>
+    <div v-if="open" :id="inputId" class="check-form">
+      <div class="buttons" role="group" aria-label="Modo de criação do CHECK"><button class="btn" :aria-pressed="!advanced" @click="switchMode(false)">Montar por seleções</button><button class="btn" :aria-pressed="advanced" @click="switchMode(true)">SQL avançado</button></div>
+      <template v-if="!advanced">
+        <CheckBuilder v-model="builder" :column="column" :columns="columns"/>
+        <p v-if="preview.error" class="fieldhelp">{{preview.error}}</p>
+        <details v-else><summary>Ver SQL gerado</summary><pre><code>{{formatCheckSQL(preview.sql)}}</code></pre></details>
+      </template>
+      <template v-else>
+        <label :for="`${inputId}-sql`">Expressão SQL do CHECK</label>
+        <textarea :id="`${inputId}-sql`" v-model="expression" rows="4" placeholder="valor > 0 ou numero >= 1" :aria-invalid="!!error" :aria-describedby="error?`${inputId}-error`:`${inputId}-help`" @input="error=''"/>
+        <p :id="`${inputId}-help`" class="fieldhelp">Informe somente a expressão, sem CHECK (...). Expressões avançadas precisam ser revisadas ao renomear ou excluir colunas.</p>
+      </template>
       <p v-if="error" :id="`${inputId}-error`" class="name-error" role="alert">{{error}}</p>
-      <div class="buttons"><button class="btn primary" :disabled="!expression.trim()" @click="submit">{{editingId?'Salvar CHECK':'Adicionar restrição'}}</button><button class="btn" @click="open=false;error=''">Cancelar</button></div>
+      <div class="buttons"><button class="btn primary" :disabled="advanced?!expression.trim():!!preview.error" @click="submit">{{editingId?'Salvar CHECK':'Adicionar restrição'}}</button><button class="btn" @click="open=false;error=''">Cancelar</button></div>
     </div>
   </div>
 </template>
@@ -40,4 +53,6 @@ function removeCheck(id){props.remove(id);if(editingId.value===id){open.value=fa
 .check-entry { border-left: 2px solid #68548c; padding-left: 12px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; color: #d1c2ff; font-size: 12px; line-height: 1.6; }
 .check-form textarea { margin-top: 0; }
+summary { color: #b2bfd2; font-size: 12px; cursor: pointer; }
+details pre { margin-top: 10px; }
 </style>

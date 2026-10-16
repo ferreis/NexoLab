@@ -266,3 +266,49 @@ test('modelos antigos sem CHECK continuam importando e CHECK convive com composi
   assert.equal(store.exported.tabelas[0].colunas[1].checks[0].expressao,'numero >= 1')
   assert.equal(store.exported.tabelas[0].colunas[1].unique,false)
 })
+
+test('construtor CHECK preserva seleções no JSON e acompanha renomeações',async()=>{
+  const {makeCheckBuilder}=await import('../src/checkBuilder.js')
+  const store=parcelas()
+  const column=store.columns[1]
+  const builder=makeCheckBuilder(column)
+  store.saveCheck(column,null,'',builder)
+  const exported=JSON.parse(JSON.stringify(store.exported))
+  store.importData(exported)
+  assert.deepEqual(store.exported,exported)
+  const target=store.columns[1]
+  store.renameColumn(target,'parcela')
+  assert.equal(target.checks[0].expressao,'"parcela" >= 1')
+  assert.equal(target.checks[0].construtor.grupos[0].condicoes[0].coluna,'parcela')
+  assert.throws(()=>store.renameColumn(target,''),/CHECK/)
+  assert.equal(target.nome,'parcela')
+  const saved=JSON.stringify(store.doc)
+  globalThis.localStorage.getItem=()=>saved
+  setActivePinia(createPinia())
+  assert.equal(useModelStore().columns[1].checks[0].expressao,'"parcela" >= 1')
+})
+
+test('remover coluna referenciada remove CHECK do construtor, preservando SQL avançado',async()=>{
+  const {makeCheckBuilder}=await import('../src/checkBuilder.js')
+  const store=parcelas()
+  const [financeiro,numero]=store.columns
+  const builder=makeCheckBuilder(numero)
+  Object.assign(builder.grupos[0].condicoes[0],{origem:'coluna',valor:financeiro.nome})
+  store.saveCheck(numero,null,'',builder)
+  store.saveCheck(numero,null,'numero > 0')
+  store.renameColumn(financeiro,'origem_id')
+  assert.equal(numero.checks[0].expressao,'"numero" >= "origem_id"')
+  assert.equal(store.removeColumn(financeiro.uid),1)
+  assert.deepEqual(numero.checks.map(c=>c.expressao),['numero > 0'])
+})
+
+test('importação recusa construtor CHECK inconsistente com a expressão',async()=>{
+  const {makeCheckBuilder}=await import('../src/checkBuilder.js')
+  const store=parcelas()
+  store.saveCheck(store.columns[1],null,'',makeCheckBuilder(store.columns[1]))
+  const exported=JSON.parse(JSON.stringify(store.exported))
+  exported.tabelas[0].colunas[1].checks[0].expressao='numero < 0'
+  const original=store.doc
+  assert.throws(()=>store.importData(exported),/não corresponde/)
+  assert.equal(store.doc,original)
+})
