@@ -28,7 +28,7 @@ defineExpose({add:()=>edit()})
 
 <template>
   <div class="check-editor">
-    <HelpTooltip label="CHECK" text="Valida uma condição em cada registro. Rejeita FALSE; TRUE e NULL satisfazem a condição. Não substitui NOT NULL."><button class="btn check-collapse" :aria-label="expanded?'Recolher CHECK':'Expandir CHECK'" :aria-expanded="expanded" :aria-controls="`${inputId}-content`" @click="expanded=!expanded"><ChevronUp v-if="expanded" :size="14"/><ChevronDown v-else :size="14"/>CHECK ({{column.checks.length}})</button></HelpTooltip>
+    <button class="btn check-collapse" :aria-label="expanded?'Recolher CHECK':'Expandir CHECK'" :aria-expanded="expanded" :aria-controls="`${inputId}-content`" @click="expanded=!expanded"><ChevronUp v-if="expanded" :size="14"/><ChevronDown v-else :size="14"/>CHECK ({{column.checks.length}})</button>
     <div v-show="expanded" :id="`${inputId}-content`" class="check-content">
     <div v-for="(check,index) in column.checks" :key="check.uid" class="check-entry">
       <pre><code>{{formatCheckSQL(check.expressao)}}</code></pre>

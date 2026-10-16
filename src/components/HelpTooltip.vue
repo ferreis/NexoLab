@@ -17,7 +17,7 @@ async function show(){clearTimeout(openTimer);clearTimeout(closeTimer);open.valu
 function schedule(){
   clearTimeout(closeTimer)
   clearTimeout(openTimer)
-  if(!open.value)openTimer=setTimeout(show,5000)
+  if(!open.value)openTimer=setTimeout(show,3000)
 }
 function close(){clearTimeout(openTimer);clearTimeout(closeTimer);open.value=false}
 function leave(){clearTimeout(openTimer);clearTimeout(closeTimer);closeTimer=setTimeout(close,150)}
@@ -30,7 +30,7 @@ onBeforeUnmount(()=>{close();document.removeEventListener('pointerdown',outside)
 <template>
   <span ref="root" class="help-tooltip" :class="{'help-control':!!$slots.default}" @mouseenter="schedule" @mousemove="schedule" @mouseleave="leave" @keydown.esc.stop="close">
     <slot/>
-    <button type="button" class="help-trigger" :aria-label="`Ajuda: ${label}`" :aria-expanded="open" :aria-describedby="open?id:undefined" @focus="focusHelp" @blur="close" @mousedown.prevent @click.stop.prevent><CircleAlert :size="14"/></button>
+    <span class="help-trigger" role="img" tabindex="0" :aria-label="`Ajuda: ${label}`" :aria-describedby="open?id:undefined" @focus="focusHelp" @blur="close" @mousedown.prevent><CircleAlert :size="14"/></span>
     <Teleport to="body">
       <span v-if="open" :id="id" ref="panel" role="tooltip" class="help-popup" :style="position" @mouseenter="show" @mouseleave="leave">{{text}}</span>
     </Teleport>
@@ -46,7 +46,6 @@ onBeforeUnmount(()=>{close();document.removeEventListener('pointerdown',outside)
 .help-control .help-trigger { margin-right: 4px; }
 .help-control:focus-within { outline: 2px solid #a38cf9; outline-offset: 2px; }
 .help-control .help-trigger:focus-visible, .help-control :slotted(.btn):focus-visible { outline: none; }
-.help-trigger { display: inline-grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border: 0; padding: 0; border-radius: 4px; background: transparent; color: #b8a4f1; cursor: help; }
-.help-trigger:hover, .help-trigger[aria-expanded=true] { background: #302940; color: #eee5ff; }
+.help-trigger { display: inline-grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border: 0; padding: 0; background: transparent; color: #b8a4f1; cursor: default; }
 .help-popup { position: fixed; z-index: 100; display: block; width: max-content; max-width: min(340px,calc(100vw - 16px)); max-height: min(280px,calc(100dvh - 16px)); overflow-y: auto; white-space: pre-line; overflow-wrap: anywhere; border: 1px solid #303d51; border-radius: 6px; background: #202939; color: #d2dbea; padding: 10px 12px; box-shadow: 0 6px 20px #0006; font-size: 12px; line-height: 1.6; }
 </style>
