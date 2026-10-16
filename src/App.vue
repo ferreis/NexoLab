@@ -5,6 +5,7 @@ import TableCombobox from './components/TableCombobox.vue'
 import NameInput from './components/NameInput.vue'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
+const sortedTables=computed(()=>[...store.doc.tabelas].sort((a,b)=>a.nome.trim().localeCompare(b.nome.trim(),'pt-BR',{sensitivity:'base'})))
 const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const previewScope=ref('all'), formatOpen=ref(false)
@@ -149,7 +150,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <label>Projeto<input v-model="store.doc.projeto" placeholder="Nome do projeto"/></label>
         <label>Schema<input v-model="store.doc.schema" placeholder="rpg"/></label>
         <nav class="tablelist">
-          <button v-for="t in store.doc.tabelas" :key="t.uid" class="tablebtn" :title="t.nome||'Sem nome'" :class="{active:store.selectedId===t.uid}" @click="store.selectedId=t.uid">
+          <button v-for="t in sortedTables" :key="t.uid" class="tablebtn" :title="t.nome||'Sem nome'" :class="{active:store.selectedId===t.uid}" @click="store.selectedId=t.uid">
             <Database :size="15"/><span>{{t.nome||'Sem nome'}}</span><small>{{t.colunas.length}}</small>
           </button>
         </nav>
