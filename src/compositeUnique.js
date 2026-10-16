@@ -1,5 +1,8 @@
 import { normalizedName } from './modelNames.js'
 
+// A primeira coluna é a origem do cadastro; as demais participam da restrição.
+export const isCompositeOwner=(group,columnId)=>group.colunas[0]===columnId
+
 export const groupKey=ids=>[...ids].sort().join('|')
 
 export function validateGroup(ids,columns){

@@ -11,7 +11,7 @@ test('TXT mantém UNIQUE, composições e múltiplos CHECKs junto às respectiva
   const expression='numero >= 1 -- mínimo'
   const combined='(financeiro_id IS NOT NULL AND numero > 0)\nOR financeiro_id IS NULL'
   store.importData({projeto:'Teste',schema_alvo:'public',tabelas:[{
-    nome:'parcelas',uniqueCompostos:[{colunas:['financeiro_id','numero']}],colunas:[
+    nome:'parcelas',uniqueCompostos:[{colunas:['numero','financeiro_id']}],colunas:[
       {nome:'financeiro_id',tipo:'BIGINT',fk:true,fkTabela:'financeiro',fkColuna:'id'},
       {nome:'numero',tipo:'SMALLINT',descricao:'Sequência de parcelas.',checks:[{expressao:expression},{expressao:combined}]},
       {nome:'referencia',tipo:'TEXT',unique:true},
@@ -24,11 +24,13 @@ test('TXT mantém UNIQUE, composições e múltiplos CHECKs junto às respectiva
   const columns=text.split(/(?=^- )/m)
   assert.doesNotMatch(columns[0],/CHECK|UNIQUE/)
   assert.ok(text.includes('TABELA: parcelas\n- financeiro_id:'))
-  assert.match(columns[1],/financeiro_id: BIGINT \| FK -> financeiro.id \| NOT NULL \| UNIQUE composto \(financeiro_id, numero\)/)
+  assert.match(columns[1],/financeiro_id: BIGINT \| FK -> financeiro.id \| NOT NULL/)
+  assert.doesNotMatch(columns[1],/UNIQUE/)
   assert.doesNotMatch(columns[1],/CHECK/)
-  assert.match(columns[2],/numero: SMALLINT \| NOT NULL \| UNIQUE composto \(financeiro_id, numero\) \| Regra: Sequência de parcelas\./)
+  assert.match(columns[2],/numero: SMALLINT \| NOT NULL \| UNIQUE Compose \(numero, financeiro_id\) \| Regra: Sequência de parcelas\./)
   assert.ok(columns[2].includes(' | CHECK (numero >= 1) | CHECK ((financeiro_id IS NOT NULL AND numero > 0) OR financeiro_id IS NULL)'))
   assert.equal(columns[2].trim().split('\n').length,1)
+  assert.equal((text.match(/UNIQUE Compose/g)||[]).length,1)
   assert.equal((text.match(/CHECK \(/g)||[]).length,2)
   assert.match(columns[3],/referencia: TEXT \| NOT NULL \| UNIQUE/)
   assert.doesNotMatch(columns[3],/composto|CHECK/)

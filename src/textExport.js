@@ -1,3 +1,4 @@
+import { isCompositeOwner } from './compositeUnique.js'
 import { formatCheckText } from './checkConstraints.js'
 
 const showSize=type=>['VARCHAR','CHAR','NUMERIC'].includes(type)
@@ -10,7 +11,7 @@ export function formatText(d){
       `- ${c.nome||'sem_nome'}: ${c.tipo}${showSize(c.tipo)&&c.tamanho?'('+c.tamanho+(c.tipo==='NUMERIC'&&c.escala?','+c.escala:'')+')':''}`,
       c.pk?'PK':'',c.fk?`FK -> ${c.fkTabela}.${c.fkColuna||'id'}`:'',c.nullable?'NULL':'NOT NULL',
       c.unique?'UNIQUE':'',
-      ...t.uniqueCompostos.filter(group=>group.colunas.includes(c.nome)).map(group=>`UNIQUE composto (${group.colunas.join(', ')})`),
+      ...t.uniqueCompostos.filter(group=>isCompositeOwner(group,c.nome)).map(group=>`UNIQUE Compose (${group.colunas.join(', ')})`),
       c.padrao?`DEFAULT ${c.padrao} (na criação)`:'',
       c.imutavel?'IMUTÁVEL após o primeiro preenchimento':'',
       c.tipo==='ENUM'?`ENUM [${c.enumValores.join(', ')}]`:'',

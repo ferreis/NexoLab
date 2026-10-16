@@ -187,8 +187,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               </div>
             </div>
             <div v-if="store.isCompositeUnique(c)||store.isCheckEnabled(c)" class="rule-actions">
-              <button v-if="store.isCompositeUnique(c)" class="btn" @click="uniqueEditors.get(c.uid)?.add()"><Plus :size="14"/>Adicionar unique compose</button>
-              <button v-if="store.isCheckEnabled(c)" class="btn" @click="checkEditors.get(c.uid)?.add()"><Plus :size="14"/>Adicionar CHECK</button>
+              <button v-if="store.isCompositeUnique(c)" class="btn" @click="uniqueEditors.get(c.uid)?.add()"><Plus :size="14"/>UNIQUE Compose</button>
+              <button v-if="store.isCheckEnabled(c)" class="btn" @click="checkEditors.get(c.uid)?.add()"><Plus :size="14"/>CHECK</button>
             </div>
             <p v-if="c.pk && store.primaryKeyColumns.length>1" class="typehelp">Estas colunas formam uma única PK composta: a combinação dos valores é única. Marque UNIQUE apenas se esta coluna também precisar ser única individualmente.</p>
             <div class="fields2" v-if="c.fk">
