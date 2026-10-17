@@ -45,3 +45,41 @@ test('TXT mantém uma linha vazia entre tabelas e nenhuma após o título',()=>{
   assert.ok(text.includes(' | PK | NOT NULL\n\nTABELA: beta\n- id:'))
   assert.doesNotMatch(text,/TABELA: [^\n]+\n\n/)
 })
+
+test('TXT exporta comentário como SQL com nomes, aspas, barras e quebras de linha preservados',()=>{
+  globalThis.localStorage={getItem:()=>null,setItem:()=>{}}
+  setActivePinia(createPinia())
+  const store=useModelStore()
+  const comentario="Perspectiva d'origem.\nCaminho C:\\dados; '); DROP TABLE x; --"
+  store.importData({schema_alvo:'RPG"Especial',tabelas:[{nome:'Conexões"A',comentario,colunas:[]}]})
+  const sql='COMMENT ON TABLE "RPG""Especial"."Conexões""A" IS\nE\'Perspectiva d\'\'origem.\nCaminho C:\\\\dados; \'\'); DROP TABLE x; --\';'
+  assert.equal(store.exported.tabelas[0].comentario_sql,sql)
+  assert.ok(formatText(store.exported).includes(`TABELA: Conexões"A\n${sql}`))
+  assert.equal(store.selected.comentario,comentario)
+})
+
+test('TXT emite COMMENT ON TABLE somente para comentários preenchidos',()=>{
+  const table={nome:'conexoes',comentario:'A direção é significativa.',colunas:[],uniqueCompostos:[]}
+  const doc={projeto:'Teste',schema_alvo:'rpg',tabelas:[table]}
+  assert.ok(formatText(doc).includes('COMMENT ON TABLE "rpg"."conexoes" IS\n\'A direção é significativa.\';'))
+  for(const comentario of [undefined,'',' \n ']){
+    assert.doesNotMatch(formatText({...doc,tabelas:[{...table,comentario}]}),/COMMENT ON TABLE/)
+  }
+})
+
+test('TXT e JSON geram COMMENT ON COLUMN separado da regra com escape dos identificadores e texto',()=>{
+  globalThis.localStorage={getItem:()=>null,setItem:()=>{}}
+  setActivePinia(createPinia())
+  const store=useModelStore()
+  store.importData({schema_alvo:'rpg"A',tabelas:[{nome:'conexoes"B',colunas:[
+    {nome:'lealdade"C',tipo:'SMALLINT',descricao:'Entre 0 e 5.',comentario:"Perspectiva d'origem.\nC:\\dados"},
+    {nome:'sem_comentario',tipo:'TEXT',comentario:' \n '}
+  ]}]})
+  const exported=store.exported
+  const sql=`COMMENT ON COLUMN "rpg""A"."conexoes""B"."lealdade""C" IS\nE'Perspectiva d''origem.\nC:\\\\dados';`
+  assert.equal(exported.tabelas[0].colunas[0].comentario_sql,sql)
+  const txt=formatText(exported)
+  assert.ok(txt.includes(`Regra: Entre 0 e 5.\n${sql}\n- sem_comentario:`))
+  assert.equal((txt.match(/COMMENT ON COLUMN/g)||[]).length,1)
+  assert.equal(exported.tabelas[0].colunas[1].comentario_sql,undefined)
+})

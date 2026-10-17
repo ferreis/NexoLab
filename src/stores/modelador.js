@@ -4,6 +4,7 @@ import { availableName, duplicateNameError, nameConflict } from '../modelNames.j
 import { convertGroups, groupKey, validateGroup, isCompositeOwner } from '../compositeUnique.js'
 import { checkExpression, convertChecks } from '../checkConstraints.js'
 import { compileCheckBuilder, cloneBuilder, builderUsesColumn, visitCheckConditions } from '../checkBuilder.js'
+import { formatTableComment, formatColumnComment } from '../tableComments.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -24,8 +25,8 @@ export const TYPES = [
   ['TEXT[]','Lista de textos.']
 ]
 const makeId=()=>crypto.randomUUID()
-export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,checkEnabled:false,checks:[],fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:''})
-export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
+export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,checkEnabled:false,checks:[],fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:'',comentario:''})
+export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',comentario:'',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
 const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
 export const isDefaultColumn=c=>['id','criado_em','atualizado_em'].includes(columnName(c))
@@ -34,12 +35,13 @@ function orderColumns(columns){
   return [...columns].sort((a,b)=>rank(a)-rank(b))
 }
 function convertColumn(c){
-  const {atualizarAoAlterar,...fields}=c
+  const {atualizarAoAlterar,comentario_sql,...fields}=c
   const description=String(c.descricao||'')
   const updateRule='Atualizar com a data e hora atuais a cada alteração do registro.'
   return {
     ...makeColumn(),...fields,...(c.pk?{imutavel:true,nullable:false}:{}),uid:c.uid||makeId(),padrao:String(c.padrao??c.default??''),fk:!!(c.fk||c.fkTabela),
     checks:convertChecks(c.checks),
+    comentario:String(c.comentario??''),
     descricao:atualizarAoAlterar&&!/a cada alteração/i.test(description)?[description,updateRule].filter(Boolean).join('\n'):description,
     enumValores:Array.isArray(c.enumValores)?c.enumValores:c.enumValores?.split(/[,\n]/).map(v=>v.trim()).filter(Boolean)||[]
   }
@@ -50,7 +52,7 @@ function convert(input){
     const colunas=orderColumns((t.colunas||[]).map(convertColumn))
     for(const column of colunas)for(const check of column.checks)if(check.construtor&&compileCheckBuilder(check.construtor,colunas)!==check.expressao)throw new Error('A expressão CHECK não corresponde às condições do construtor.')
     return {
-    uid:t.uid||makeId(),nome:String(t.nome||''),finalidade:String(t.finalidade??t.descricao??''),
+    uid:t.uid||makeId(),nome:String(t.nome||''),comentario:String(t.comentario??''),finalidade:String(t.finalidade??t.descricao??''),
     regras:[String(t.regras??t.observacoes??''),t.automacoes?`Triggers e funções:\n${t.automacoes}`:''].filter(Boolean).join('\n\n'),
     colunas,uniqueCompostos:convertGroups(t.uniqueCompostos,colunas)
   }})}
@@ -205,9 +207,12 @@ export const useModelStore=defineStore('modelador',()=>{
   }
   const exported=computed(()=>({
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
-    tabelas:sortedTables.value.map(t=>({nome:t.nome,
+    tabelas:sortedTables.value.map(t=>({nome:t.nome,comentario:t.comentario,
+      ...(formatTableComment(doc.value.schema,t)?{comentario_sql:formatTableComment(doc.value.schema,t)}:{}),
       uniqueCompostos:t.uniqueCompostos.map(group=>({colunas:group.colunas.map(id=>t.colunas.find(c=>c.uid===id).nome)})),
-      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,checks:checks.map(({uid,...check})=>check),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
+      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,
+        ...(formatColumnComment(doc.value.schema,t,c)?{comentario_sql:formatColumnComment(doc.value.schema,t,c)}:{}),
+        checks:checks.map(({uid,...check})=>check),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
   return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported,addCompositeUnique,removeCompositeUnique}
 })

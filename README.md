@@ -16,6 +16,10 @@ npm run dev
 
 Abra o endereço mostrado pelo Vite (normalmente `http://localhost:5173`).
 
+O campo **Comentário**, abaixo do nome da tabela, aceita explicações em várias linhas. O JSON preserva o texto em `comentario` e inclui o comando correspondente em `comentario_sql` quando preenchido. O TXT mostra `COMMENT ON TABLE "schema"."tabela" IS 'texto';` abaixo do título da tabela. Aspas e barras são escapadas no SQL; alterações no nome da tabela ou no schema atualizam o comando automaticamente. Importação e armazenamento local preservam o texto para edição, e modelos antigos abrem com o campo vazio.
+
+Cada coluna também possui um campo **Comentário**, separado de **Regra**. O JSON da coluna guarda `comentario` e o comando gerado em `comentario_sql`; o TXT apresenta `COMMENT ON COLUMN "schema"."tabela"."coluna" IS 'texto';` logo após a linha da coluna. O comentário acompanha renomeações de schema, tabela e coluna, com a mesma preservação de texto e escape usados nos comentários de tabela.
+
 ## Funcionalidades
 
 - Editor de tabelas e colunas; inserção de ID e datas padrão sem duplicação.

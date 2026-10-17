@@ -1,5 +1,5 @@
 import { compileCheckBuilder, isCheckGroup } from './checkBuilder.js'
-const reserved=new Set('AND OR NOT IS NULL TRUE FALSE UNKNOWN CHECK IN BETWEEN LIKE ILIKE SELECT CASE WHEN THEN ELSE END CAST CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP LOCALTIME LOCALTIMESTAMP CURRENT_USER SESSION_USER USER'.split(' '))
+const reserved=new Set('AND OR NOT IS DISTINCT FROM NULL TRUE FALSE UNKNOWN CHECK IN BETWEEN LIKE ILIKE SELECT CASE WHEN THEN ELSE END CAST CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP LOCALTIME LOCALTIMESTAMP CURRENT_USER SESSION_USER USER'.split(' '))
 
 // Conversor deliberadamente restrito ao que o formulário consegue representar.
 // Não executa SQL nem tenta simplificar expressões desconhecidas.
@@ -32,7 +32,7 @@ function tokenize(sql){
     if(word){tokens.push({kind:'word',value:word[0]});i+=word[0].length;continue}
     const operator=rest.match(/^(?:>=|<=|<>|!=|=|>|<)/)
     if(operator){tokens.push({kind:'operator',value:operator[0]==='!='?'<>':operator[0]});i+=operator[0].length;continue}
-    if('();'.includes(char)){tokens.push({kind:char,value:char});i++;continue}
+    if('();,'.includes(char)){tokens.push({kind:char,value:char});i++;continue}
     throw new Error(`O trecho “${rest.slice(0,20)}” não é suportado pelo formulário.`)
   }
   return tokens
@@ -53,13 +53,28 @@ export function parseCheckSQL(sql,columns){
     return name
   }
   function compare(){
+    // Para dois campos, exatamente um preenchido é um OU entre dois grupos E.
+    // Cada teste IS NULL/IS NOT NULL sempre resulta em boolean, como num_nonnulls.
+    if(word('NUM_NONNULLS')&&tokens[index+1]?.kind==='('){
+      index++;take('(')
+      const first=column(tokens[index++]);take(',')
+      const second=column(tokens[index++]);take(')')
+      if(take('operator').value!=='='||Number(take('number').value)!==1)throw new Error('O formulário suporta num_nonnulls com duas colunas e comparação = 1.')
+      return {operador:'OR',itens:[
+        {operador:'AND',itens:[{coluna:first,operador:'IS NOT NULL'},{coluna:second,operador:'IS NULL'}]},
+        {operador:'AND',itens:[{coluna:first,operador:'IS NULL'},{coluna:second,operador:'IS NOT NULL'}]}
+      ]}
+    }
     const left=column(tokens[index++])
+    let operator
     if(word('IS')){
       index++;const not=word('NOT');if(not)index++
-      if(!word('NULL'))throw new Error('O formulário suporta IS NULL e IS NOT NULL.')
-      index++;return {coluna:left,operador:not?'IS NOT NULL':'IS NULL'}
-    }
-    const operator=take('operator').value
+      if(word('NULL')){index++;return {coluna:left,operador:not?'IS NOT NULL':'IS NULL'}}
+      if(!word('DISTINCT'))throw new Error('O formulário suporta IS [NOT] NULL e IS [NOT] DISTINCT FROM.')
+      index++
+      if(!word('FROM'))throw new Error('Esperava FROM após DISTINCT.')
+      index++;operator=not?'IS NOT DISTINCT FROM':'IS DISTINCT FROM'
+    }else operator=take('operator').value
     const token=tokens[index++]
     if(!token)throw new Error('Falta o valor ou a coluna da comparação.')
     const base={coluna:left,operador:operator,origem:'valor'}
