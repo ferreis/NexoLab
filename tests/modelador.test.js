@@ -8,6 +8,65 @@ beforeEach(()=>{
   setActivePinia(createPinia())
 })
 
+test('comentário de coluna é independente da regra, persiste e gera SQL atualizado após renomeações',()=>{
+  const store=useModelStore()
+  store.importData({schema_alvo:'rpg',tabelas:[{nome:'conexoes',colunas:[
+    {nome:'lealdade',tipo:'SMALLINT',descricao:'Entre 0 e 5.',comentario:"Perspectiva d'origem.\nPode diferir do destino."},
+    {nome:'outra',tipo:'TEXT',descricao:'Outra regra.'}
+  ]}]})
+  assert.equal(store.columns[1].comentario,'')
+  const exported=JSON.parse(JSON.stringify(store.exported))
+  store.importData(exported)
+  assert.deepEqual(JSON.parse(JSON.stringify(store.exported)),exported)
+  const column=store.columns[0]
+  assert.equal(column.descricao,'Entre 0 e 5.')
+  assert.equal(column.comentario,"Perspectiva d'origem.\nPode diferir do destino.")
+  store.renameColumn(column,'nivel')
+  store.renameTable(store.selected,'relacoes')
+  store.doc.schema='outro'
+  assert.ok(store.exported.tabelas[0].colunas[0].comentario_sql.startsWith('COMMENT ON COLUMN "outro"."relacoes"."nivel" IS'))
+  const saved=JSON.stringify(store.doc)
+  globalThis.localStorage.getItem=()=>saved
+  setActivePinia(createPinia())
+  const restored=useModelStore()
+  assert.equal(restored.columns[0].comentario,column.comentario)
+  restored.columns[0].comentario=''
+  assert.equal(restored.exported.tabelas[0].colunas[0].comentario_sql,undefined)
+  assert.equal(restored.columns[0].descricao,'Entre 0 e 5.')
+})
+
+test('comentário da tabela sobrevive ao JSON e restauração local e acompanha tabela e schema',()=>{
+  const store=useModelStore()
+  store.addTable()
+  assert.equal(store.selected.comentario,'')
+  store.selected.comentario="Registra a perspectiva d'origem.\nA direção é significativa."
+  const exported=JSON.parse(JSON.stringify(store.exported))
+  store.importData(exported)
+  assert.equal(store.selected.comentario,exported.tabelas[0].comentario)
+  assert.deepEqual(JSON.parse(JSON.stringify(store.exported)),exported)
+  store.renameTable(store.selected,'conexoes')
+  store.doc.schema='outro'
+  assert.ok(store.exported.tabelas[0].comentario_sql.startsWith('COMMENT ON TABLE "outro"."conexoes" IS'))
+  const local=JSON.stringify(store.doc)
+  globalThis.localStorage={getItem:key=>key==='modelador-rpg-vue-v2'?local:null,setItem:()=>{}}
+  setActivePinia(createPinia())
+  const restored=useModelStore()
+  assert.equal(restored.selected.comentario,exported.tabelas[0].comentario)
+})
+
+test('tabelas antigas sem comentário abrem com campo vazio e comentários são independentes',()=>{
+  const store=useModelStore()
+  store.importData({tabelas:[{nome:'antiga'},{nome:'outra',comentario:'Explicação.'}]})
+  assert.equal(store.selected.comentario,'')
+  assert.equal(store.exported.tabelas[0].comentario_sql,undefined)
+  store.selected.comentario=' \n '
+  assert.equal(store.exported.tabelas[0].comentario_sql,undefined)
+  store.selectedId=store.doc.tabelas[1].uid
+  assert.equal(store.selected.comentario,'Explicação.')
+  store.selected.comentario=''
+  assert.equal(store.exported.tabelas[1].comentario_sql,undefined)
+})
+
 test('novas tabelas recebem nomes disponíveis, inclusive após exclusões',()=>{
   const store=useModelStore()
   store.addTable();store.addTable();store.addTable()

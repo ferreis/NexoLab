@@ -1,4 +1,4 @@
-export const CHECK_OPERATORS=[['=','Igual a'],['<>','Diferente de'],['>','Maior que'],['>=','Maior ou igual a'],['<','Menor que'],['<=','Menor ou igual a'],['IS NULL','Está vazio (NULL)'],['IS NOT NULL','Está preenchido']]
+export const CHECK_OPERATORS=[['=','Igual a'],['<>','Diferente de'],['>','Maior que'],['>=','Maior ou igual a'],['<','Menor que'],['<=','Menor ou igual a'],['IS DISTINCT FROM','Diferente, considerando NULL'],['IS NOT DISTINCT FROM','Igual, considerando NULL'],['IS NULL','Está vazio (NULL)'],['IS NOT NULL','Está preenchido']]
 const numericTypes=['BIGINT','INTEGER','SMALLINT','NUMERIC']
 export const isNumericColumn=column=>numericTypes.includes(column?.tipo)
 export const cloneBuilder=builder=>JSON.parse(JSON.stringify(builder))
