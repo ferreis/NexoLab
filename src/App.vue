@@ -7,6 +7,7 @@ import CompositeUniqueEditor from './components/CompositeUniqueEditor.vue'
 import ColumnBadges from './components/ColumnBadges.vue'
 import HelpTooltip from './components/HelpTooltip.vue'
 import CheckEditor from './components/CheckEditor.vue'
+import EnumValuesInput from './components/EnumValuesInput.vue'
 import { formatText } from './textExport.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
@@ -117,8 +118,6 @@ async function confirmDelete(){
 function help(t){helpType.value=helpType.value===t?'':t}
 function removeColumn(id){if(store.removeColumn(id))toast('Coluna excluída. As composições UNIQUE e os CHECKs do construtor que dependiam dela também foram removidos.')}
 function toggleCard(id){const next=new Set(collapsed.value);next.has(id)?next.delete(id):next.add(id);collapsed.value=next}
-function enumText(c){return c.enumValores.join('\n')}
-function setEnum(c,str){c.enumValores=str.split(/[,\n]/).map(s=>s.trim()).filter(Boolean)}
 function setType(c,v){c.tipo=v;if(!showSize(v)){c.tamanho='';c.escala=''}if(v!=='ENUM')c.enumValores=[];if(!fks.includes(v)){c.fk=false;c.fkTabela=''}}
 const typeInfo=t=>TYPES.find(x=>x[0]===t)?.[1]||''
 async function copyPreview(){if(store.nameError){toast(store.nameError);return}try{await navigator.clipboard.writeText(previewContent.value);toast(previewScope.value==='all'?'Projeto copiado.':'Tabela atual copiada.')}catch{toast('Não foi possível copiar.')}}
@@ -196,7 +195,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               <label>Tabela referenciada<TableCombobox :model-value="c.fkTabela" :options="store.doc.tabelas.map(t=>t.nome)" @update:model-value="store.setForeignTable(c,$event)"/></label>
               <label>Coluna referenciada<input v-model="c.fkColuna" placeholder="id"/></label>
             </div>
-            <label v-if="c.tipo==='ENUM'">Valores do ENUM, um por linha<textarea :value="enumText(c)" @input="setEnum(c,$event.target.value)" rows="3"/></label>
+            <label v-if="c.tipo==='ENUM'">Valores do ENUM, separados por Enter ou vírgula<EnumValuesInput :key="c.uid" v-model="c.enumValores"/></label>
             <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :ref="instance=>registerEditor(uniqueEditors,c.uid,instance)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
             <CheckEditor v-if="store.isCheckEnabled(c)" :ref="instance=>registerEditor(checkEditors,c.uid,instance)" :column="c" :columns="store.selected.colunas" :save="(id,expression,builder)=>store.saveCheck(c,id,expression,builder)" :remove="id=>store.removeCheck(c,id)"/>
             <label>Regra<textarea v-model="c.descricao" rows="2"/></label>
