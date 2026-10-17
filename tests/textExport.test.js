@@ -4,6 +4,18 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useModelStore } from '../src/stores/modelador.js'
 import { formatText } from '../src/textExport.js'
 
+test('TXT e JSON não exportam default de FK, inclusive se houver um valor residual no estado',()=>{
+  globalThis.localStorage={getItem:()=>null,setItem:()=>{}}
+  setActivePinia(createPinia())
+  const store=useModelStore()
+  store.importData({tabelas:[{nome:'conexoes',colunas:[{nome:'origem_id',tipo:'BIGINT',fk:true,padrao:'42'}]}]})
+  // Simula um estado residual para verificar também a barreira da exportação.
+  store.columns[0].padrao='42'
+  assert.equal(store.exported.tabelas[0].colunas[0].padrao,'')
+  assert.doesNotMatch(JSON.stringify(store.exported),/42/)
+  assert.doesNotMatch(formatText(store.exported),/DEFAULT|42/)
+})
+
 test('TXT mantém UNIQUE, composições e múltiplos CHECKs junto às respectivas colunas',()=>{
   globalThis.localStorage={getItem:()=>null,setItem:()=>{}}
   setActivePinia(createPinia())

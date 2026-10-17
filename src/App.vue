@@ -171,10 +171,10 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               <label v-if="showSize(c.tipo)">{{c.tipo==='NUMERIC'?'Precisão':'Comprimento máximo'}}<input v-model="c.tamanho" type="number" min="1"/></label>
             </div>
             <p v-if="helpType===c.uid" class="typehelp">{{c.tipo}}: {{typeInfo(c.tipo)}}</p>
-            <div class="column-options" :class="{'has-scale':c.tipo==='NUMERIC','without-default':c.pk||c.fk}">
-              <div v-if="c.tipo==='NUMERIC'||(!c.pk&&!c.fk)" class="fields2 defaultsrow">
+            <div class="column-options" :class="{'has-scale':c.tipo==='NUMERIC','without-default':c.fk}">
+              <div v-if="c.tipo==='NUMERIC'||!c.fk" class="fields2 defaultsrow">
                 <label v-if="c.tipo==='NUMERIC'">Casas decimais<input v-model="c.escala" type="number" min="0"/></label>
-                <label v-if="!c.pk&&!c.fk">Valor padrão na criação<input v-model="c.padrao" placeholder="Sem padrão definido"/></label>
+                <label v-if="!c.fk">Valor padrão na criação<input v-model="c.padrao" placeholder="Sem padrão definido"/></label>
               </div>
               <div class="checkrow">
                 <label v-if="c.pk||!store.primaryKeyColumns.length" class="check"><input :checked="c.pk" type="checkbox" @change="store.setPrimaryKey(c,$event.target.checked)"/> <KeyRound :size="14"/> PK</label>

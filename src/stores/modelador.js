@@ -35,11 +35,12 @@ function orderColumns(columns){
   return [...columns].sort((a,b)=>rank(a)-rank(b))
 }
 function convertColumn(c){
-  const {atualizarAoAlterar,comentario_sql,...fields}=c
+  const {atualizarAoAlterar,comentario_sql,default:legacyDefault,...fields}=c
+  const fk=!!(c.fk||c.fkTabela)
   const description=String(c.descricao||'')
   const updateRule='Atualizar com a data e hora atuais a cada alteração do registro.'
   return {
-    ...makeColumn(),...fields,...(c.pk?{imutavel:true,nullable:false}:{}),uid:c.uid||makeId(),padrao:String(c.padrao??c.default??''),fk:!!(c.fk||c.fkTabela),
+    ...makeColumn(),...fields,...(c.pk?{imutavel:true,nullable:false}:{}),uid:c.uid||makeId(),padrao:fk?'':String(c.padrao??legacyDefault??''),fk,
     checks:convertChecks(c.checks),
     comentario:String(c.comentario??''),
     descricao:atualizarAoAlterar&&!/a cada alteração/i.test(description)?[description,updateRule].filter(Boolean).join('\n'):description,
@@ -148,7 +149,7 @@ export const useModelStore=defineStore('modelador',()=>{
   }
   function setForeignKey(column,enabled){
     column.fk=enabled
-    if(enabled)useDefaultKeyType(column)
+    if(enabled){useDefaultKeyType(column);column.padrao=''}
   }
   function setForeignTable(column,tableName){
     const previous=column.fkTabela.trim()
@@ -210,7 +211,7 @@ export const useModelStore=defineStore('modelador',()=>{
     tabelas:sortedTables.value.map(t=>({nome:t.nome,comentario:t.comentario,
       ...(formatTableComment(doc.value.schema,t)?{comentario_sql:formatTableComment(doc.value.schema,t)}:{}),
       uniqueCompostos:t.uniqueCompostos.map(group=>({colunas:group.colunas.map(id=>t.colunas.find(c=>c.uid===id).nome)})),
-      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,
+      colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,padrao:c.fk?'':c.padrao,
         ...(formatColumnComment(doc.value.schema,t,c)?{comentario_sql:formatColumnComment(doc.value.schema,t,c)}:{}),
         checks:checks.map(({uid,...check})=>check),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
