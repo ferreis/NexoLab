@@ -19,7 +19,7 @@ export function formatText(d){
       c.tipo==='ENUM'?`ENUM [${c.enumValores.join(', ')}]`:'',
       c.descricao?`Regra: ${c.descricao}`:'',
       ...c.checks.map(check=>formatCheckText(check.expressao))
-    ].filter(Boolean).join(' | '),formatColumnComment(d.schema_alvo,t,c)])
+    ].filter(Boolean).join(' | '),formatColumnComment(d.schema_alvo,t,c)]),
   ...(t.sqlRestricoes?.length?['Restrições SQL:',...t.sqlRestricoes]:[]),
     ...(t.sqlTriggers?.length?['Triggers SQL:',...t.sqlTriggers]:[]),
     ...(t.sqlIndices?.length?['Índices SQL:',...t.sqlIndices]:[]),
