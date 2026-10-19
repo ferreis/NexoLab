@@ -12,15 +12,16 @@ import SqlImportDialog from './components/SqlImportDialog.vue'
 import BulkEditDialog from './components/BulkEditDialog.vue'
 import SqlFunctionManager from './components/SqlFunctionManager.vue'
 import SchemaObjectDialog from './components/SchemaObjectDialog.vue'
+import SchemaRulesDialog from './components/SchemaRulesDialog.vue'
 import { schemaCategories, schemaEntries } from './schemaNavigation.js'
 import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
 import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
-import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow } from 'lucide-vue-next'
+import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, FilePenLine, ArrowDownToLine } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
-const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null)
+const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null), schemaRulesDialog=ref(null), previewScroll=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const sidebarCategory=ref('tables')
 const sidebarCategories=computed(()=>schemaCategories(store.doc))
@@ -47,6 +48,14 @@ async function selectFormat(format){
   ;(previewScope.value==='all'?scopeAll.value:scopeTable.value)?.focus()
 }
 function togglePreview(){rightOpen.value=!rightOpen.value;formatOpen.value=false}
+function scrollPreviewToEnd(){
+  if(previewScroll.value)previewScroll.value.scrollTop=previewScroll.value.scrollHeight
+}
+const previewEndLabel=computed(()=>previewScope.value==='table'?`Fim da prévia da tabela ${store.selected?.nome||''}`:`Fim da prévia do schema ${store.doc.schema||''} (${store.doc.tabelas.length} tabelas)`)
+watch([previewScope,tab,()=>store.selectedId],async()=>{
+  await nextTick()
+  if(previewScroll.value)previewScroll.value.scrollTop=0
+})
 const dragged=ref(null), dropTarget=ref(null)
 function startDrag(event,column){
   dragged.value={id:column.uid,tableId:store.selectedId}
@@ -186,8 +195,17 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
             <button class="iconbtn" title="Recolher barra lateral" aria-label="Recolher barra lateral" @click="leftOpen=false"><PanelLeftClose :size="18"/></button>
           </div>
         </div>
-        <label>Schema<input v-model="store.doc.schema" placeholder="rpg"/></label>
-        <label>Regras do schema<FunctionMentionTextarea v-model="store.doc.regrasSchema" :functions="store.doc.funcoesSql" :rows="3" @open-function="name=>functionDialog?.open(name)"/></label>
+        <div class="schema-field">
+          <div class="schema-field-heading">
+            <label for="schema-name">Schema</label>
+            <button type="button" class="schema-rules-trigger" title="Editar regras do schema" aria-label="Editar regras do schema" @click="schemaRulesDialog?.open()">
+              <FilePenLine :size="14"/>
+              <span>Regras</span>
+              <span v-if="store.doc.regrasSchema?.trim()" class="schema-rules-dot" aria-label="Regras cadastradas"/>
+            </button>
+          </div>
+          <input id="schema-name" v-model="store.doc.schema" placeholder="rpg"/>
+        </div>
         <details v-if="store.doc.comentariosSql?.length" class="sql-schema-info">
           <summary>Comentários SQL ({{store.doc.comentariosSql.length}})</summary>
           <details v-for="(sql,i) in store.doc.comentariosSql" :key="'comment'+i"><summary>Comentário SQL {{i+1}}</summary><pre>{{sql}}</pre></details>
@@ -295,8 +313,17 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           <button :class="{active:tab==='json'}" :aria-pressed="tab==='json'" @click="selectFormat('json')">JSON</button>
         </div>
         <div class="code-preview">
-          <div class="code-toolbar"><span>{{tab.toUpperCase()}}</span><button class="code-copy" :title="previewCopyLabel" :aria-label="previewCopyLabel" :disabled="!!store.nameError||(previewScope==='table'&&!store.selected)" @click="copyPreview"><Copy :size="14"/>Copiar</button></div>
-          <pre><code>{{previewScope==='table'&&!store.selected?'Selecione ou crie uma tabela para visualizar.':previewContent}}</code></pre>
+          <div class="code-toolbar">
+            <span>{{tab.toUpperCase()}}</span>
+            <div class="preview-toolbar-actions">
+              <button class="code-copy" type="button" title="Ir ao final da prévia" aria-label="Ir ao final da prévia" @click="scrollPreviewToEnd"><ArrowDownToLine :size="14"/>Fim</button>
+              <button class="code-copy" type="button" :title="previewCopyLabel" :aria-label="previewCopyLabel" :disabled="!!store.nameError||(previewScope==='table'&&!store.selected)" @click="copyPreview"><Copy :size="14"/>Copiar</button>
+            </div>
+          </div>
+          <div ref="previewScroll" class="preview-scroll" tabindex="0" aria-label="Conteúdo completo da prévia; use a rolagem para consultar o texto até o final">
+            <pre><code>{{previewScope==='table'&&!store.selected?'Selecione ou crie uma tabela para visualizar.':previewContent}}</code></pre>
+            <div class="preview-end-marker"><span aria-hidden="true">✓</span> {{previewEndLabel}}</div>
+          </div>
         </div>
       </template>
     </aside>
@@ -305,6 +332,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
   <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>
   <SqlFunctionManager ref="functionDialog"/>
   <SchemaObjectDialog ref="objectDialog" @select-table="sidebarCategory='tables'"/>
+  <SchemaRulesDialog ref="schemaRulesDialog" @open-function="name=>functionDialog?.open(name)"/>
   <dialog ref="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-description" @cancel.prevent="closeConfirmation(false)">
     <template v-if="confirmation">
       <div class="confirmation-icon"><Info :size="22"/></div>
