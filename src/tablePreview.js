@@ -18,7 +18,7 @@ export function tablePreview(project,tableIndex){
       ...(c.tipo==='ENUM'?{enumValores:c.enumValores||[]}:{}),
       ...(c.descricao?{descricao:c.descricao}:{}),
       ...(c.comentario?{comentario:c.comentario}:{}),
-      checks:c.checks||[]
+      checks:(c.checks||[]).map(check=>({expressao:check.expressao}))
     })),
     ...(source.sqlRestricoes?.some(isRelevantConstraint)?{sqlRestricoes:source.sqlRestricoes.filter(isRelevantConstraint).filter(sql=>!(source.colunas||[]).some(c=>(c.checks||[]).some(check=>check.origemRestricao===sql)))}:{})
   }
