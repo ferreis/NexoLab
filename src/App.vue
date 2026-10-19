@@ -113,7 +113,8 @@ const txt=computed(()=>formatText(store.exported))
 const json=computed(()=>JSON.stringify(store.exported,null,2))
 const previewData=computed(()=>{
   if(previewScope.value==='all')return store.exported
-  return tablePreview(store.exported,store.selected?.nome)
+  const index=store.sortedTables.findIndex(t=>t.uid===store.selectedId)
+  return tablePreview(store.exported,index)
 })
 const previewContent=computed(()=>tab.value==='txt'?formatText(previewData.value):JSON.stringify(previewData.value,null,2))
 const previewCopyLabel=computed(()=>previewScope.value==='all'?'Copiar tudo':'Copiar tabela atual')
