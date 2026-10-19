@@ -20,6 +20,17 @@ O campo **Comentário**, abaixo do nome da tabela, aceita explicações em vári
 
 Cada coluna também possui um campo **Comentário**, separado de **Regra**. O JSON da coluna guarda `comentario` e o comando gerado em `comentario_sql`; o TXT apresenta `COMMENT ON COLUMN "schema"."tabela"."coluna" IS 'texto';` logo após a linha da coluna. O comentário acompanha renomeações de schema, tabela e coluna, com a mesma preservação de texto e escape usados nos comentários de tabela.
 
+## Importar definições SQL
+
+Clique em **Importar SQL**, cole uma definição PostgreSQL ou escolha um arquivo .sql/.txt de até 4 MB, e depois em **Analisar SQL**. Uma prévia informa as quantidades de tabelas, colunas, restrições, triggers, tipos ENUM, funções e políticas RLS. Por fim, escolha uma das opções:
+
+- **Mesclar com o projeto:** adiciona tabelas e colunas ainda não presentes. Tabelas e colunas com o mesmo nome são preservadas, inclusive alterações feitas manualmente. Restrições SQL, índices, triggers, políticas, enums e funções são incorporados sem duplicar declarações idênticas. O mesmo arquivo pode ser importado novamente sem gerar tabelas ou colunas duplicadas.
+- **Substituir modelo atual:** limpa as tabelas e definições do modelo local e importa somente as do SQL. Exige confirmação adicional no diálogo. Não executa DROP TABLE nem qualquer outra instrução no banco real.
+
+O parser aceita CREATE TABLE, CREATE TYPE ... AS ENUM, CREATE [OR REPLACE] FUNCTION, CREATE TRIGGER, índices, CREATE POLICY, ALTER TABLE ... ADD CONSTRAINT, ALTER COLUMN ... ADD GENERATED ... AS IDENTITY, comentários de tabela/coluna/tipo/função/schema e controles RLS. Reconhece SQL do painel Supabase e exportações de schema feitas por pg_dump. Restrições SQL complexas e políticas RLS permanecem em **Definições SQL importadas** na tabela; enums e funções podem ser consultados na barra lateral.
+
+Tipos não representados no seletor visual são registrados como **CUSTOM**, mantendo seu tipo PostgreSQL original. O leitor não é um executor SQL nem substitui uma ferramenta de migração: estruturas não suportadas precisam de revisão manual. O JSON exportado preserva os metadados SQL reconhecidos e permite restaurá-los posteriormente. O TXT continua sendo um relatório de modelagem, não um script SQL executável.
+
 ## Funcionalidades
 
 - Editor de tabelas e colunas; inserção de ID e datas padrão sem duplicação.

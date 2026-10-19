@@ -5,6 +5,7 @@ import { convertGroups, groupKey, validateGroup, isCompositeOwner } from '../com
 import { checkExpression, convertChecks } from '../checkConstraints.js'
 import { compileCheckBuilder, cloneBuilder, builderUsesColumn, visitCheckConditions } from '../checkBuilder.js'
 import { formatTableComment, formatColumnComment } from '../tableComments.js'
+import { parsePostgresDDL } from '../sqlImport.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -22,12 +23,13 @@ export const TYPES = [
   ['UUID','Identificador universal único; também pode ser PK ou FK.'],
   ['JSONB','Documento JSON estruturado e indexável.'],
   ['ENUM','Conjunto controlado de valores, definido no PostgreSQL.'],
+  ['CUSTOM','Tipo PostgreSQL personalizado. Consulte o tipo SQL original.'],
   ['TEXT[]','Lista de textos.']
 ]
 const makeId=()=>crypto.randomUUID()
 export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,checkEnabled:false,checks:[],fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:'',comentario:''})
 export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',comentario:'',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
-const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[]})
+const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[],enums:[],funcoesSql:[],comentariosSql:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
 export const isDefaultColumn=c=>['id','criado_em','atualizado_em'].includes(columnName(c))
 function orderColumns(columns){
@@ -49,13 +51,19 @@ function convertColumn(c){
 }
 function convert(input){
   if (!input || !Array.isArray(input.tabelas)) throw new Error('Arquivo sem a lista de tabelas')
-  return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),tabelas:input.tabelas.map(t=>{
+  return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),
+    enums:Array.isArray(input.enums)?input.enums:[],funcoesSql:Array.isArray(input.funcoesSql)?input.funcoesSql:[],comentariosSql:Array.isArray(input.comentariosSql)?input.comentariosSql:[],
+    tabelas:input.tabelas.map(t=>{
     const colunas=orderColumns((t.colunas||[]).map(convertColumn))
     for(const column of colunas)for(const check of column.checks)if(check.construtor&&compileCheckBuilder(check.construtor,colunas)!==check.expressao)throw new Error('A expressão CHECK não corresponde às condições do construtor.')
     return {
     uid:t.uid||makeId(),nome:String(t.nome||''),comentario:String(t.comentario??''),finalidade:String(t.finalidade??t.descricao??''),
     regras:[String(t.regras??t.observacoes??''),t.automacoes?`Triggers e funções:\n${t.automacoes}`:''].filter(Boolean).join('\n\n'),
-    colunas,uniqueCompostos:convertGroups(t.uniqueCompostos,colunas)
+    colunas,uniqueCompostos:convertGroups(t.uniqueCompostos,colunas),
+    sqlRestricoes:Array.isArray(t.sqlRestricoes)?t.sqlRestricoes:[],
+    sqlTriggers:Array.isArray(t.sqlTriggers)?t.sqlTriggers:[],
+    sqlIndices:Array.isArray(t.sqlIndices)?t.sqlIndices:[],
+    sqlPoliticas:Array.isArray(t.sqlPoliticas)?t.sqlPoliticas:[]
   }})}
 }
 export const useModelStore=defineStore('modelador',()=>{
@@ -206,14 +214,77 @@ export const useModelStore=defineStore('modelador',()=>{
     doc.value=imported
     selectedId.value=doc.value.tabelas[0]?.uid||null
   }
+  function importSql(sql,mode='merge'){
+    if(!['merge','replace'].includes(mode))throw new Error('Modo de importação inválido.')
+    const parsed=parsePostgresDDL(sql,doc.value.schema||'rpg')
+    const current=JSON.parse(JSON.stringify(doc.value))
+    let addedTables=0,addedColumns=0,skippedColumns=0
+    if(mode==='replace'){
+      importData({...parsed,projeto:current.projeto})
+      return {...parsed.resumo,addedTables:parsed.tabelas.length,addedColumns:parsed.resumo.colunas,skippedColumns:0,avisos:parsed.avisos}
+    }
+    if(current.tabelas.length && current.schema.trim().toLowerCase()!==parsed.schema_alvo.trim().toLowerCase()){
+      throw new Error('O SQL usa o schema '+parsed.schema_alvo+', mas o projeto atual usa '+current.schema+'. Importe em um projeto vazio ou use Substituir.')
+    }
+    if(!current.tabelas.length)current.schema=parsed.schema_alvo
+    current.enums??=[]
+    current.funcoesSql??=[]
+    current.comentariosSql??=[]
+    const identifier=s=>String(s).trim().toLowerCase()
+    const appendUnique=(target,source)=>{for(const item of source||[])if(!target.some(x=>JSON.stringify(x)===JSON.stringify(item)))target.push(item)}
+    for(const incoming of parsed.tabelas){
+      const target=current.tabelas.find(t=>identifier(t.nome)===identifier(incoming.nome))
+      if(!target){current.tabelas.push(incoming);addedTables++;addedColumns+=incoming.colunas.length;continue}
+      target.sqlRestricoes??=[]
+      target.sqlTriggers??=[]
+      target.sqlIndices??=[]
+      target.sqlPoliticas??=[]
+      for(const col of incoming.colunas){
+        if(target.colunas.some(existing=>identifier(existing.nome)===identifier(col.nome))){skippedColumns++;continue}
+        target.colunas.push(col);addedColumns++
+      }
+      appendUnique(target.sqlRestricoes,incoming.sqlRestricoes)
+      appendUnique(target.sqlTriggers,incoming.sqlTriggers)
+      appendUnique(target.sqlIndices,incoming.sqlIndices)
+      appendUnique(target.sqlPoliticas,incoming.sqlPoliticas)
+      target.uniqueCompostos??=[]
+      for(const group of incoming.uniqueCompostos){
+        const groupKey=names=>[...names].map(identifier).sort().join('|')
+        const existingKeys=target.uniqueCompostos.map(g=>groupKey(g.colunas.map(id=>target.colunas.find(c=>c.uid===id)?.nome||id)))
+        if(!existingKeys.includes(groupKey(group.colunas)))target.uniqueCompostos.push(group)
+      }
+      if(!target.comentario?.trim()&&incoming.comentario)target.comentario=incoming.comentario
+    }
+    for(const incoming of parsed.enums){
+      const old=current.enums.find(e=>identifier(e.schema)===identifier(incoming.schema)&&identifier(e.nome)===identifier(incoming.nome))
+      if(old)old.valores=[...new Set([...old.valores,...incoming.valores])]
+      else current.enums.push(incoming)
+    }
+    appendUnique(current.funcoesSql,parsed.funcoesSql)
+    appendUnique(current.comentariosSql,parsed.comentariosSql)
+    const imported=convert(current)
+    const error=duplicateNameError(imported.tabelas)
+    if(error)throw new Error(error)
+    const previousSelected=selected.value?.nome
+    doc.value=imported
+    selectedId.value=doc.value.tabelas.find(t=>identifier(t.nome)===identifier(previousSelected))?.uid||doc.value.tabelas[0]?.uid||null
+    return {...parsed.resumo,addedTables,addedColumns,skippedColumns,avisos:parsed.avisos}
+  }
   const exported=computed(()=>({
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
+    ...(doc.value.enums?.length?{enums:doc.value.enums}:{}),
+    ...(doc.value.funcoesSql?.length?{funcoesSql:doc.value.funcoesSql}:{}),
+    ...(doc.value.comentariosSql?.length?{comentariosSql:doc.value.comentariosSql}:{}),
     tabelas:sortedTables.value.map(t=>({nome:t.nome,comentario:t.comentario,
+      ...(t.sqlRestricoes?.length?{sqlRestricoes:t.sqlRestricoes}:{}),
+      ...(t.sqlTriggers?.length?{sqlTriggers:t.sqlTriggers}:{}),
+      ...(t.sqlIndices?.length?{sqlIndices:t.sqlIndices}:{}),
+      ...(t.sqlPoliticas?.length?{sqlPoliticas:t.sqlPoliticas}:{}),
       ...(formatTableComment(doc.value.schema,t)?{comentario_sql:formatTableComment(doc.value.schema,t)}:{}),
       uniqueCompostos:t.uniqueCompostos.map(group=>({colunas:group.colunas.map(id=>t.colunas.find(c=>c.uid===id).nome)})),
       colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,padrao:c.fk?'':c.padrao,
         ...(formatColumnComment(doc.value.schema,t,c)?{comentario_sql:formatColumnComment(doc.value.schema,t,c)}:{}),
         checks:checks.map(({uid,...check})=>check),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,exported,addCompositeUnique,removeCompositeUnique}
+  return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,importSql,exported,addCompositeUnique,removeCompositeUnique}
 })

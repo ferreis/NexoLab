@@ -8,12 +8,13 @@ import ColumnBadges from './components/ColumnBadges.vue'
 import HelpTooltip from './components/HelpTooltip.vue'
 import CheckEditor from './components/CheckEditor.vue'
 import EnumValuesInput from './components/EnumValuesInput.vue'
+import SqlImportDialog from './components/SqlImportDialog.vue'
 import { formatText } from './textExport.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
-const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null)
+const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const previewScope=ref('all'), formatOpen=ref(false)
 const scopeAll=ref(null), scopeTable=ref(null)
@@ -107,6 +108,7 @@ const previewData=computed(()=>{
 })
 const previewContent=computed(()=>tab.value==='txt'?formatText(previewData.value):JSON.stringify(previewData.value,null,2))
 const previewCopyLabel=computed(()=>previewScope.value==='all'?'Copiar tudo':'Copiar tabela atual')
+function sqlImported(summary,mode){collapseDefaults();toast(mode==='merge'?`SQL mesclado: ${summary.addedTables} tabelas e ${summary.addedColumns} colunas adicionadas.`:`SQL importado: ${summary.tabelas} tabelas carregadas.`)}
 async function importJson(e){const f=e.target.files?.[0];if(!f)return;try{const data=JSON.parse(await f.text());if(store.doc.tabelas.length&&!await askConfirmation({title:'Substituir projeto?',message:'As tabelas do projeto atual serão substituídas pelo arquivo importado. Exporte o projeto antes se quiser guardar uma cópia.',action:'Substituir projeto'}))return;store.importData(data);collapseDefaults();toast('Projeto importado.')}catch(err){toast('Erro ao importar: '+err.message)}finally{e.target.value=''}}
 async function confirmDelete(){
   const table=store.selected
@@ -128,7 +130,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
   <header class="topbar">
     <div class="brand"><Database :size="23"/><div><strong>NexoDB Lab</strong><small>Projetos PostgreSQL e Supabase, sem alterar o banco</small></div></div>
     <div class="top-actions">
-      <button class="btn ghost" @click="fileInput?.click()"><Upload :size="15"/> Importar</button>
+      <button class="btn ghost" @click="fileInput?.click()"><Upload :size="15"/> Importar JSON</button>
+      <button class="btn ghost" @click="sqlDialog?.open()"><Upload :size="15"/> Importar SQL</button>
       <button class="btn" :disabled="!!store.nameError" @click="download('modelo-banco.json',json,'application/json')"><FileJson :size="15"/> JSON</button>
       <button class="btn primary" :disabled="!!store.nameError" @click="download('modelo-banco.txt',txt,'text/plain')"><Download :size="15"/> TXT</button>
       <input ref="fileInput" type="file" accept=".json,application/json" hidden @change="importJson"/>
@@ -141,6 +144,12 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div class="sidehead"><h2>Tabelas <span class="subtle">({{store.doc.tabelas.length}})</span></h2><div class="panel-actions"><button class="iconbtn" title="Criar tabela" @click="store.addTable()"><Plus :size="18"/></button><button class="iconbtn" title="Recolher tabelas" aria-label="Recolher tabelas" @click="leftOpen=false"><PanelLeftClose :size="18"/></button></div></div>
         <label>Projeto<input v-model="store.doc.projeto" placeholder="Nome do projeto"/></label>
         <label>Schema<input v-model="store.doc.schema" placeholder="rpg"/></label>
+        <details v-if="store.doc.enums?.length||store.doc.funcoesSql?.length||store.doc.comentariosSql?.length" class="sql-schema-info">
+          <summary>Objetos SQL ({{store.doc.enums?.length||0}} enums, {{store.doc.funcoesSql?.length||0}} funções, {{store.doc.comentariosSql?.length||0}} comentários)</summary>
+          <details v-for="item in store.doc.enums" :key="item.schema+'.'+item.nome"><summary>ENUM {{item.nome}}</summary><pre>{{item.valores.join(', ')}}</pre></details>
+          <details v-for="(sql,i) in store.doc.funcoesSql" :key="i"><summary>Função {{i+1}}</summary><pre>{{sql}}</pre></details>
+          <details v-for="(sql,i) in store.doc.comentariosSql" :key="'comment'+i"><summary>Comentário SQL {{i+1}}</summary><pre>{{sql}}</pre></details>
+        </details>
         <nav class="tablelist">
           <button v-for="t in store.sortedTables" :key="t.uid" class="tablebtn" :title="t.nome||'Sem nome'" :class="{active:store.selectedId===t.uid}" @click="store.selectedId=t.uid">
             <Database :size="15"/><span>{{t.nome||'Sem nome'}}</span><small>{{t.colunas.length}}</small>
@@ -157,6 +166,13 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)"/></label>
           <label>Comentário<textarea v-model="store.selected.comentario" rows="3" placeholder="Explique a finalidade ou as regras desta tabela."/></label>
         </div>
+        <details v-if="store.selected.sqlRestricoes?.length||store.selected.sqlTriggers?.length||store.selected.sqlIndices?.length||store.selected.sqlPoliticas?.length" class="sql-table-info">
+          <summary>Definições SQL importadas ({{(store.selected.sqlRestricoes?.length||0)+(store.selected.sqlTriggers?.length||0)+(store.selected.sqlIndices?.length||0)+(store.selected.sqlPoliticas?.length||0)}})</summary>
+          <div v-if="store.selected.sqlRestricoes?.length"><h3>Restrições (PK, FK, UNIQUE, CHECK)</h3><pre v-for="(item,i) in store.selected.sqlRestricoes" :key="'constraint'+i">{{item}}</pre></div>
+          <div v-if="store.selected.sqlTriggers?.length"><h3>Triggers</h3><pre v-for="(item,i) in store.selected.sqlTriggers" :key="'trigger'+i">{{item}}</pre></div>
+          <div v-if="store.selected.sqlIndices?.length"><h3>Índices</h3><pre v-for="(item,i) in store.selected.sqlIndices" :key="'index'+i">{{item}}</pre></div>
+          <div v-if="store.selected.sqlPoliticas?.length"><h3>Políticas e RLS</h3><pre v-for="(item,i) in store.selected.sqlPoliticas" :key="'policy'+i">{{item}}</pre></div>
+        </details>
         <div class="sectionhead columnsheading"><h2>Colunas <span class="subtle">({{store.selected.colunas.length}})</span></h2><div class="buttons"><button class="btn" :disabled="!store.columns.length" @click="toggleAllColumns"><ChevronDown v-if="allColumnsCollapsed" :size="15"/><ChevronUp v-else :size="15"/>{{allColumnsCollapsed?'Expandir todas':'Recolher todas'}}</button><button class="btn" @click="addDefaults"><Plus :size="15"/> ID e datas padrão</button><button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Coluna</button></div></div>
         <div v-if="!store.selected.colunas.length" class="empty">Nenhuma coluna cadastrada. Use <strong>ID e datas padrão</strong> ou adicione uma coluna.</div>
         <p id="reorder-help" class="sr-only">Arraste pela alça para reordenar, ou use as setas para cima e para baixo com a alça em foco. ID e datas permanecem fixos.</p>
@@ -170,6 +186,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               </label>
               <label v-if="showSize(c.tipo)">{{c.tipo==='NUMERIC'?'Precisão':'Comprimento máximo'}}<input v-model="c.tamanho" type="number" min="1"/></label>
             </div>
+            <label v-if="c.tipo==='CUSTOM'">Tipo SQL original<input v-model="c.sqlTipoOriginal" placeholder="Ex.: rpg.meu_tipo"/></label>
+            <label v-if="c.tipo==='ENUM'&&c.enumNome">Tipo ENUM PostgreSQL<input v-model="c.enumNome" placeholder="Ex.: rpg.fichas_tipo"/></label>
             <p v-if="helpType===c.uid" class="typehelp">{{c.tipo}}: {{typeInfo(c.tipo)}}</p>
             <div class="column-options" :class="{'has-scale':c.tipo==='NUMERIC','without-default':c.fk}">
               <div v-if="c.tipo==='NUMERIC'||!c.fk" class="fields2 defaultsrow">
@@ -227,6 +245,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
       </template>
     </aside>
   </div>
+  <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
   <dialog ref="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-description" @cancel.prevent="closeConfirmation(false)">
     <template v-if="confirmation">
       <div class="confirmation-icon"><Info :size="22"/></div>
