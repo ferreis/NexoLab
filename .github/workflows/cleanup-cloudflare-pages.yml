@@ -1,8 +1,8 @@
 name: Limpar historico do Cloudflare Pages
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: "17 6 * * *"
   workflow_dispatch:
 
 permissions:
