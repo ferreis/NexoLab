@@ -4,6 +4,7 @@ import { Code2, Copy, X } from 'lucide-vue-next'
 import { useModelStore } from '../stores/modelador.js'
 import { triggerName } from '../schemaNavigation.js'
 
+const emit=defineEmits(['select-table'])
 const store=useModelStore()
 const modal=ref(null)
 const selection=ref(null)
@@ -32,6 +33,7 @@ async function copy(){
 function goToTable(){
   if(!table.value)return
   store.selectedId=table.value.uid
+  emit('select-table')
   modal.value?.close()
 }
 defineExpose({open})
