@@ -16,7 +16,7 @@ import { schemaCategories, schemaEntries } from './schemaNavigation.js'
 import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
 import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
-import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, ListFilter } from 'lucide-vue-next'
+import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
@@ -299,7 +299,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
   <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
   <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>
   <SqlFunctionManager ref="functionDialog"/>
-  <SchemaObjectDialog ref="objectDialog"/>
+  <SchemaObjectDialog ref="objectDialog" @select-table="sidebarCategory='tables'"/>
   <dialog ref="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-description" @cancel.prevent="closeConfirmation(false)">
     <template v-if="confirmation">
       <div class="confirmation-icon"><Info :size="22"/></div>
