@@ -115,7 +115,7 @@ function column(name,raw,enums,warnings,schema){
   return {nome:name,tipo,tamanho,escala,sqlTipoOriginal:type,enumNome,enumValores,
     nullable:!/\bNOT\s+NULL\b|\bPRIMARY\s+KEY\b/i.test(opts),pk:/\bPRIMARY\s+KEY\b/i.test(opts),
     unique:/\bUNIQUE\b/i.test(opts),padrao,checks,checkEnabled:checks.length>0,
-    fk:!!foreign,fkTabela:foreign?qualified(foreign[1],schema).nome:'',fkColuna:foreign?unquote(foreign[2]):'id',
+    fk:!!foreign,fkTabela:foreign?(qualified(foreign[1],schema).schema===schema?qualified(foreign[1],schema).nome:qualified(foreign[1],schema).schema+'.'+qualified(foreign[1],schema).nome):'',fkColuna:foreign?unquote(foreign[2]):'id',
     descricao:'',comentario:''}
 }
 function constraint(t,sql,schema){
@@ -135,7 +135,7 @@ function constraint(t,sql,schema){
     return
   }
   const fk=re('^FOREIGN\\s+KEY\\s*\\(\\s*('+ID+')\\s*\\)\\s*REFERENCES\\s+('+NAME+')\\s*\\(\\s*('+ID+')\\s*\\)').exec(body)
-  if(fk){const c=t.colunas.find(c=>norm(c.nome)===norm(unquote(fk[1])));if(c){c.fk=true;c.fkTabela=qualified(fk[2],schema).nome;c.fkColuna=unquote(fk[3])}}
+  if(fk){const c=t.colunas.find(c=>norm(c.nome)===norm(unquote(fk[1])));if(c){const ref=qualified(fk[2],schema);c.fk=true;c.fkTabela=ref.schema===schema?ref.nome:ref.schema+'.'+ref.nome;c.fkColuna=unquote(fk[3])}}
 }
 function createTable(sql,schema,enums,warnings){
   const m=re('^CREATE\\s+(?:UNLOGGED\\s+)?TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?('+NAME+')\\s*\\(').exec(sql)
