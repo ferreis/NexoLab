@@ -62,7 +62,8 @@ function convert(input){
     colunas,uniqueCompostos:convertGroups(t.uniqueCompostos,colunas),
     sqlRestricoes:Array.isArray(t.sqlRestricoes)?t.sqlRestricoes:[],
     sqlTriggers:Array.isArray(t.sqlTriggers)?t.sqlTriggers:[],
-    sqlIndices:Array.isArray(t.sqlIndices)?t.sqlIndices:[]
+    sqlIndices:Array.isArray(t.sqlIndices)?t.sqlIndices:[],
+    sqlPoliticas:Array.isArray(t.sqlPoliticas)?t.sqlPoliticas:[]
   }})}
 }
 export const useModelStore=defineStore('modelador',()=>{
@@ -236,6 +237,7 @@ export const useModelStore=defineStore('modelador',()=>{
       target.sqlRestricoes??=[]
       target.sqlTriggers??=[]
       target.sqlIndices??=[]
+      target.sqlPoliticas??=[]
       for(const col of incoming.colunas){
         if(target.colunas.some(existing=>identifier(existing.nome)===identifier(col.nome))){skippedColumns++;continue}
         target.colunas.push(col);addedColumns++
@@ -243,6 +245,7 @@ export const useModelStore=defineStore('modelador',()=>{
       appendUnique(target.sqlRestricoes,incoming.sqlRestricoes)
       appendUnique(target.sqlTriggers,incoming.sqlTriggers)
       appendUnique(target.sqlIndices,incoming.sqlIndices)
+      appendUnique(target.sqlPoliticas,incoming.sqlPoliticas)
       target.uniqueCompostos??=[]
       for(const group of incoming.uniqueCompostos){
         const groupKey=names=>[...names].map(identifier).sort().join('|')
@@ -273,6 +276,7 @@ export const useModelStore=defineStore('modelador',()=>{
       ...(t.sqlRestricoes?.length?{sqlRestricoes:t.sqlRestricoes}:{}),
       ...(t.sqlTriggers?.length?{sqlTriggers:t.sqlTriggers}:{}),
       ...(t.sqlIndices?.length?{sqlIndices:t.sqlIndices}:{}),
+      ...(t.sqlPoliticas?.length?{sqlPoliticas:t.sqlPoliticas}:{}),
       ...(formatTableComment(doc.value.schema,t)?{comentario_sql:formatTableComment(doc.value.schema,t)}:{}),
       uniqueCompostos:t.uniqueCompostos.map(group=>({colunas:group.colunas.map(id=>t.colunas.find(c=>c.uid===id).nome)})),
       colunas:orderColumns(t.colunas).map(({uid,uniqueComposto,checkEnabled,checks,...c})=>({...c,padrao:c.fk?'':c.padrao,
