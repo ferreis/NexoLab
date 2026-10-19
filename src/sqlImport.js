@@ -153,7 +153,7 @@ function createTable(sql,schema,enums,warnings){
   return t
 }
 export function parsePostgresDDL(sql,defaultSchema='rpg'){
-  const statements=splitSqlStatements(sql),enums=[],warnings=[],functions=[],other=[],create=[]
+  const statements=splitSqlStatements(sql),enums=[],warnings=[],functions=[],other=[],create=[],comentariosSql=[]
   let ignored=0
   for(const st of statements){
     const m=re('^CREATE\\s+TYPE\\s+('+NAME+')\\s+AS\\s+ENUM\\s*\\(').exec(st)
@@ -170,6 +170,16 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
   const schema=tables[0].schema
   const find=r=>tables.find(t=>norm(t.schema)===norm(r.schema)&&norm(t.nome)===norm(r.nome))
   for(const st of other){
+    if(/^COMMENT\s+ON\s+(?:TYPE|FUNCTION|SCHEMA)\b/i.test(st)){
+      comentariosSql.push(st)
+      const typeComment=re('^COMMENT\\s+ON\\s+TYPE\\s+('+NAME+')\\s+IS\\s+(E?\\x27(?:\\x27\\x27|[^\\x27])*\\x27|NULL)').exec(st)
+      if(typeComment){
+        const target=qualified(typeComment[1],schema)
+        const existing=enums.find(e=>norm(e.schema)===norm(target.schema)&&norm(e.nome)===norm(target.nome))
+        if(existing)existing.comentario=/^NULL$/i.test(typeComment[2])?'':literal(typeComment[2])
+      }
+      continue
+    }
     let policy=re('^CREATE\\s+POLICY\\s+[\\s\\S]+?\\bON\\s+('+NAME+')(?=\\s|;|$)').exec(st)
     if(policy){const t=find(qualified(policy[1],schema));if(t)t.sqlPoliticas.push(st);continue}
     policy=re('^ALTER\\s+TABLE\\s+('+NAME+')\\s+(?:ENABLE|DISABLE|FORCE|NO\\s+FORCE)\\s+ROW\\s+LEVEL\\s+SECURITY').exec(st)
@@ -196,8 +206,9 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
   return {schema_alvo:schema,tabelas:tables.map(({schema:unused,...t})=>t),
     enums:enums.filter(e=>norm(e.schema)===norm(schema)),
     funcoesSql:functions.filter(f=>f.toLowerCase().includes(schema.toLowerCase()+'.')||f.toLowerCase().includes('"'+schema.toLowerCase()+'".')),
+    comentariosSql,
     avisos:arrayUnique(warnings),
     resumo:{tabelas:tables.length,colunas:tables.reduce((n,t)=>n+t.colunas.length,0),
       enums:enums.filter(e=>norm(e.schema)===norm(schema)).length,funcoes:functions.length,
-      triggers:tables.reduce((n,t)=>n+t.sqlTriggers.length,0),politicas:tables.reduce((n,t)=>n+t.sqlPoliticas.length,0),restricoes:tables.reduce((n,t)=>n+t.sqlRestricoes.length,0)}}
+      triggers:tables.reduce((n,t)=>n+t.sqlTriggers.length,0),politicas:tables.reduce((n,t)=>n+t.sqlPoliticas.length,0),comentarios:comentariosSql.length,restricoes:tables.reduce((n,t)=>n+t.sqlRestricoes.length,0)}}
 }
