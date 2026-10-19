@@ -10,11 +10,12 @@ const functions=computed(()=>(store.doc.funcoesSql||[]).map((source,index)=>({in
 const visible=computed(()=>functions.value.filter(item=>[item.parsed?.name,item.parsed?.qualified,item.source].join(' ').toLowerCase().includes(query.value.toLowerCase())))
 const original=computed(()=>selectedIndex.value===null?null:functions.value[selectedIndex.value])
 const dirty=computed(()=>original.value?sql.value.trim()!==original.value.source.trim():!!sql.value.trim())
-function open(){
+function open(functionName=''){
   query.value='';error.value='';notice.value=''
-  if(functions.value.length)select(functions.value[0].index)
+  const requested=functions.value.find(item=>item.parsed?.name?.toLowerCase()===String(functionName||'').toLowerCase())
+  if(functions.value.length)select(requested?.index??functions.value[0].index)
   else prepare()
-  modal.value?.showModal()
+  if(!modal.value?.open)modal.value?.showModal()
 }
 function select(index){selectedIndex.value=index;sql.value=functions.value[index]?.source||'';error.value='';notice.value=''}
 function prepare(){selectedIndex.value=null;error.value='';notice.value='';newName.value='nova_funcao';sql.value=''}
