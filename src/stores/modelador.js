@@ -6,7 +6,7 @@ import { checkExpression, convertChecks } from '../checkConstraints.js'
 import { compileCheckBuilder, cloneBuilder, builderUsesColumn, visitCheckConditions } from '../checkBuilder.js'
 import { formatTableComment, formatColumnComment } from '../tableComments.js'
 import { parsePostgresDDL } from '../sqlImport.js'
-import { renameColumnsInDocument, renameTableInDocument, bulkReplaceName } from '../modelRefactor.js'
+import { renameColumnsInDocument, renameTableInDocument, bulkReplaceName, updateImportedCheck } from '../modelRefactor.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -127,12 +127,17 @@ export const useModelStore=defineStore('modelador',()=>{
     if(id){
       const check=column.checks.find(check=>check.uid===id)
       if(!check)throw new Error('Esta restrição CHECK não existe mais.')
+      if(check.origemRestricao)updateImportedCheck(selected.value,check,expressao)
       delete check.construtor
       Object.assign(check,fields)
     }else column.checks.push({uid:makeId(),...fields})
     column.checkEnabled=true
   }
-  function removeCheck(column,id){column.checks=column.checks.filter(check=>check.uid!==id)}
+  function removeCheck(column,id){
+    const check=column.checks.find(item=>item.uid===id)
+    if(check?.origemRestricao)updateImportedCheck(selected.value,check)
+    column.checks=column.checks.filter(item=>item.uid!==id)
+  }
   function clearColumnGroups(column){selected.value.uniqueCompostos=selected.value.uniqueCompostos.filter(group=>!isCompositeOwner(group,column.uid))}
   function setUnique(column,enabled){
     if(column.pk&&primaryKeyColumns.value.length===1)return
@@ -256,6 +261,9 @@ export const useModelStore=defineStore('modelador',()=>{
     for(const column of table.colunas){
       const next=column.checks.filter(check=>!check.construtor||!builderUsesColumn(check.construtor,name))
       removed+=column.checks.length-next.length
+      for(const discarded of column.checks.filter(check=>!next.includes(check))){
+        if(discarded.origemRestricao)updateImportedCheck(table,discarded)
+      }
       column.checks=next
     }
     table.uniqueCompostos=table.uniqueCompostos.filter(group=>!group.colunas.includes(id))
