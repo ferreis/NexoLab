@@ -139,7 +139,7 @@ function constraint(t,sql,schema){
   if(checkMatch){
     const expr=parenthesized(body,checkMatch.index+checkMatch[0].lastIndexOf('(')).trim()
     const mentioned=t.colunas.find(col=>{
-      const escaped=col.nome.replace(/\W/g,'\\  const fk=re('^FOREIGN\\s+KEY\\s*\\(\\s*('+ID+')\\s*\\)\\s*REFERENCES\\s+('+NAME+')\\s*\\(\\s*('+ID+')\\s*\\)').exec(body)')
+      const escaped=col.nome.replace(/\W/g,'\\$&')
       return new RegExp('(?:^|[^\\w$])(?:"'+escaped+'"|'+escaped+')(?![\\w$])','i').test(expr)
     })
     const owner=mentioned||t.colunas[0]
