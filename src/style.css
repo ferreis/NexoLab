@@ -182,3 +182,46 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
+
+
+/* Importação de definição PostgreSQL */
+.sql-import-dialog { width: min(850px, calc(100% - 28px)); max-height: min(92dvh, 980px); overflow: auto; padding: 0; border: 1px solid #41506a; border-radius: 12px; background: var(--surface); color: #e3e9f2; box-shadow: 0 25px 75px #0009; }
+.sql-import-dialog::backdrop { background: #080c16c4; backdrop-filter: blur(3px); }
+.sql-import-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 24px 13px; border-bottom: 1px solid var(--line); }
+.sql-import-header h2 { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 20px; }
+.sql-import-header h2 svg { color: var(--accent); flex-shrink: 0; }
+.sql-import-header p { margin: 9px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.sql-import-content { padding: 20px 24px; }
+.sql-import-label { display: block; margin-bottom: 9px; font-size: 12px; font-weight: 600; }
+.sql-import-editor { display: block; width: 100%; min-height: 180px; max-height: 42dvh; resize: vertical; padding: 13px; border: 1px solid var(--line); border-radius: 8px; background: var(--input); color: #e3e9f2; font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; tab-size: 2; }
+.sql-import-editor:focus { border-color: var(--accent); }
+.sql-import-options { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
+.sql-import-options span { font-size: 11px; color: var(--muted); }
+.sql-import-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 20px 0 0; padding: 0; border: 0; }
+.sql-import-modes legend { margin-bottom: 11px; font-size: 12px; font-weight: 650; }
+.sql-import-modes label { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid #384558; border-radius: 9px; cursor: pointer; background: #181f2b; }
+.sql-import-modes label.selected { border-color: #9077e7; background: #29253e; }
+.sql-import-modes label input { margin-top: 3px; flex-shrink: 0; accent-color: #ad9bff; }
+.sql-import-modes label strong { display: block; font-size: 12px; }
+.sql-import-modes label small { display: block; color: var(--muted); margin-top: 6px; font-size: 11px; line-height: 1.6; }
+.sql-import-summary { padding: 13px 15px; margin-top: 15px; background: #1e2837; border: 1px solid #35435a; border-radius: 8px; font-size: 12px; }
+.sql-import-summary p { margin: 6px 0; color: #c9d4e4; line-height: 1.5; }
+.sql-import-summary details { margin-top: 10px; color: #e7c68b; }
+.sql-import-summary details summary { display: flex; gap: 6px; cursor: pointer; }
+.sql-import-summary ul { padding-left: 22px; line-height: 1.5; overflow-wrap: anywhere; }
+.sql-replace-ack { display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; font-size: 12px; line-height: 1.55; color: #ffd5cf; }
+.sql-replace-ack input { margin-top: 3px; accent-color: #d57876; }
+.sql-import-error { padding: 12px; border: 1px solid #a75459; border-radius: 8px; color: #ffd8de; background: #39242d; font-size: 12px; overflow-wrap: anywhere; }
+.sql-import-footer { position: sticky; bottom: 0; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--surface); }
+.sql-schema-info { padding: 8px 5px 12px; font-size: 11px; color: var(--muted); }
+.sql-schema-info summary, .sql-table-info summary { cursor: pointer; }
+.sql-schema-info details { margin: 8px 0 0 13px; }
+.sql-schema-info pre, .sql-table-info pre { padding: 10px; margin: 7px 0; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; max-height: 240px; border-radius: 6px; border: 1px solid var(--line); background: var(--input); font: 11px/1.55 ui-monospace, monospace; }
+.sql-table-info { padding: 12px 14px; margin: 16px 0 18px; border: 1px solid var(--line); border-radius: 8px; color: #becbe1; font-size: 12px; }
+.sql-table-info h3 { margin: 13px 0 8px; font-size: 12px; color: #e3e9f2; }
+@media(max-width:767px) {
+ .sql-import-dialog { width: calc(100% - 12px); max-height: 96dvh; }
+ .sql-import-header, .sql-import-content, .sql-import-footer { padding-left: 15px; padding-right: 15px; }
+ .sql-import-modes { grid-template-columns: 1fr; }
+ .sql-import-footer .btn { flex: 1; }
+}
