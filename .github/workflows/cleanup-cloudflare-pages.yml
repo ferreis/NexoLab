@@ -21,11 +21,11 @@ jobs:
     steps:
       - name: Excluir deployments antigos sem afetar a producao
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: "0202132875af020266de25bde0a644be"
           CF_PROJECT_NAME: "nexodblab"
-          GITHUB_EVENT_NAME: \${{ github.event_name }}
-          GITHUB_COMMIT_SHA: \${{ github.sha }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_COMMIT_SHA: ${{ github.sha }}
         run: |
           python3 - <<'PY'
           import json
