@@ -53,7 +53,7 @@ export function formatTablePreviewText(preview){
     lines.push(parts.join(' | '))
     if(c.descricao)lines.push(`  Regra: ${c.descricao}`)
     if(c.comentario)lines.push(`  Comentário: ${c.comentario}`)
-    for(const check of c.checks||[])lines.push(`  CHECK: ${formatCheckText(check.expressao)}`)
+    for(const check of c.checks||[])lines.push(`  ${formatCheckText(check.expressao)}`)
   }
   if(t.uniqueCompostos?.length){
     lines.push('','UNIQUEs compostos:')
