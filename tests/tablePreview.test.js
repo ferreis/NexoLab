@@ -24,7 +24,7 @@ test('prévia da tabela mostra somente a tabela selecionada e suas regras',()=>{
   const text=formatTablePreviewText(preview)
   assert.deepEqual(preview.tabelas.map(t=>t.nome),['arcos'])
   assert.match(text,/TABELA: rpg.arcos/)
-  assert.match(text,/Restrições SQL:/)
+  assert.doesNotMatch(text,/Restrições SQL:/)
   assert.doesNotMatch(text,/Triggers SQL:/)
   assert.doesNotMatch(text,/TABELA: fichas/)
   assert.doesNotMatch(text,/ENUMs do schema:|Funções SQL:|Comentários SQL globais:/)
@@ -59,7 +59,7 @@ test('prévia não repete CHECK SQL já associado a uma coluna',()=>{
   project.tabelas[0].colunas[0].checks=[{expressao:'id > 0',origemRestricao:checkSql}]
   const preview=tablePreview(project,0)
   const text=formatTablePreviewText(preview)
-  assert.equal((text.match(/CHECK: id > 0/g)||[]).length,1)
+  assert.equal((text.match(/CHECK \(id > 0\)/g)||[]).length,1)
   assert.doesNotMatch(text,/Restrições relacionais e CHECKs adicionais:/)
 })
 test('prévia contém regras e relacionamentos mas omite SQL operacional',()=>{
