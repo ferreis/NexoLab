@@ -109,8 +109,10 @@ function column(name,raw,enums,warnings,schema){
   const generated=/\b(GENERATED\s+(?:ALWAYS|BY\s+DEFAULT)\s+AS\s+IDENTITY)\b/i.exec(opts)
   if(generated)padrao=generated[1].replace(/\s+/g,' ').toUpperCase()
   const checks=[]
-  const ck=/\bCHECK\s*\(/i.exec(opts)
-  if(ck)checks.push({expressao:parenthesized(opts,ck.index+ck[0].lastIndexOf('(')).trim()})
+  for(const ck of opts.matchAll(/\bCHECK\s*\(/gi)){
+    const expressao=parenthesized(opts,ck.index+ck[0].lastIndexOf('(')).trim()
+    if(!checks.some(item=>item.expressao===expressao))checks.push({expressao})
+  }
   const foreign=re('\\bREFERENCES\\s+('+NAME+')\\s*\\(\\s*('+ID+')\\s*\\)').exec(opts)
   return {nome:name,tipo,tamanho,escala,sqlTipoOriginal:type,enumNome,enumValores,
     nullable:!/\bNOT\s+NULL\b|\bPRIMARY\s+KEY\b/i.test(opts),pk:/\bPRIMARY\s+KEY\b/i.test(opts),
@@ -132,6 +134,21 @@ function constraint(t,sql,schema){
   if(uq){
     if(uq.length===1){const c=t.colunas.find(c=>norm(c.nome)===norm(uq[0]));if(c)c.unique=true}
     if(uq.length>1&&!t.uniqueCompostos.some(g=>g.colunas.map(norm).join('|')===uq.map(norm).join('|')))t.uniqueCompostos.push({colunas:uq})
+    return
+  }
+  // Também projeta restrições CHECK da tabela no editor de CHECKs.
+  const checkMatch=/\bCHECK\s*\(/i.exec(body)
+  if(checkMatch){
+    const expr=parenthesized(body,checkMatch.index+checkMatch[0].lastIndexOf('(')).trim()
+    const mentioned=t.colunas.find(col=>{
+      const escaped=col.nome.replace(/\W/g,'\\$&')
+      return new RegExp('(?:^|[^\\w$])(?:"'+escaped+'"|'+escaped+')(?![\\w$])','i').test(expr)
+    })
+    const owner=mentioned||t.colunas[0]
+    if(owner&&!owner.checks.some(c=>c.expressao===expr)){
+      owner.checks.push({expressao:expr,origemRestricao:sql})
+      owner.checkEnabled=true
+    }
     return
   }
   const fk=re('^FOREIGN\\s+KEY\\s*\\(\\s*('+ID+')\\s*\\)\\s*REFERENCES\\s+('+NAME+')\\s*\\(\\s*('+ID+')\\s*\\)').exec(body)
@@ -210,5 +227,5 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
     avisos:arrayUnique(warnings),
     resumo:{tabelas:tables.length,colunas:tables.reduce((n,t)=>n+t.colunas.length,0),
       enums:enums.filter(e=>norm(e.schema)===norm(schema)).length,funcoes:functions.length,
-      triggers:tables.reduce((n,t)=>n+t.sqlTriggers.length,0),politicas:tables.reduce((n,t)=>n+t.sqlPoliticas.length,0),comentarios:comentariosSql.length,restricoes:tables.reduce((n,t)=>n+t.sqlRestricoes.length,0)}}
+      triggers:tables.reduce((n,t)=>n+t.sqlTriggers.length,0),politicas:tables.reduce((n,t)=>n+t.sqlPoliticas.length,0),comentarios:comentariosSql.length,restricoes:tables.reduce((n,t)=>n+t.sqlRestricoes.length,0),checks:tables.reduce((n,t)=>n+t.colunas.reduce((sum,c)=>sum+c.checks.length,0),0)}}
 }

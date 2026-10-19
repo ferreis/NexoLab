@@ -6,6 +6,8 @@ import { checkExpression, convertChecks } from '../checkConstraints.js'
 import { compileCheckBuilder, cloneBuilder, builderUsesColumn, visitCheckConditions } from '../checkBuilder.js'
 import { formatTableComment, formatColumnComment } from '../tableComments.js'
 import { parsePostgresDDL } from '../sqlImport.js'
+import { validateFunctionSql, parseFunction, replaceFunctionReference, referencesInText } from '../sqlFunctions.js'
+import { renameColumnsInDocument, renameTableInDocument, bulkReplaceName, updateImportedCheck } from '../modelRefactor.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -29,7 +31,7 @@ export const TYPES = [
 const makeId=()=>crypto.randomUUID()
 export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,checkEnabled:false,checks:[],fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:'',comentario:''})
 export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',comentario:'',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
-const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[],enums:[],funcoesSql:[],comentariosSql:[]})
+const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',regrasSchema:'',tabelas:[],enums:[],funcoesSql:[],comentariosSql:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
 export const isDefaultColumn=c=>['id','criado_em','atualizado_em'].includes(columnName(c))
 function orderColumns(columns){
@@ -51,7 +53,7 @@ function convertColumn(c){
 }
 function convert(input){
   if (!input || !Array.isArray(input.tabelas)) throw new Error('Arquivo sem a lista de tabelas')
-  return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),
+  return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),regrasSchema:String(input.regrasSchema??''),
     enums:Array.isArray(input.enums)?input.enums:[],funcoesSql:Array.isArray(input.funcoesSql)?input.funcoesSql:[],comentariosSql:Array.isArray(input.comentariosSql)?input.comentariosSql:[],
     tabelas:input.tabelas.map(t=>{
     const colunas=orderColumns((t.colunas||[]).map(convertColumn))
@@ -78,25 +80,25 @@ export const useModelStore=defineStore('modelador',()=>{
   watch(doc,v=>{try{localStorage.setItem('modelador-rpg-vue-v2',JSON.stringify(v))}catch{}},{deep:true})
   const nameError=computed(()=>duplicateNameError(doc.value.tabelas))
   function addTable(){const t=makeTable();t.nome=availableName(doc.value.tabelas,t.nome);doc.value.tabelas.push(t);selectedId.value=t.uid}
+  const renameHelpers={compileCheckBuilder,visitCheckConditions}
   function renameTable(table,name){
-    if(nameConflict(doc.value.tabelas,name,table))throw new Error(`Já existe uma tabela com o nome “${name.trim()}”. O nome anterior foi mantido.`)
-    table.nome=name.trim()
+    if(!doc.value.tabelas.some(t=>t.uid===table.uid))return
+    // Valida a refatoração inteira antes de alterar qualquer objeto reativo.
+    renameTableInDocument(JSON.parse(JSON.stringify(doc.value)),table.uid,name,renameHelpers)
+    return renameTableInDocument(doc.value,table.uid,name,renameHelpers)
   }
   function renameColumn(column,name){
     if(!selected.value?.colunas.includes(column))return
-    if(!name.trim()&&selected.value.colunas.some(c=>c.checks.some(check=>check.construtor&&builderUsesColumn(check.construtor,column.nome))))throw new Error('Esta coluna é usada em um CHECK e precisa manter um nome.')
-    if(!name.trim()&&selected.value.uniqueCompostos.some(group=>group.colunas.includes(column.uid)))throw new Error('Esta coluna participa de um UNIQUE composto e precisa manter um nome.')
-    if(nameConflict(selected.value.colunas,name,column))throw new Error(`Já existe uma coluna com o nome “${name.trim()}” nesta tabela. O nome anterior foi mantido.`)
-    const previous=column.nome
-    column.nome=name.trim()
-    for(const c of selected.value.colunas)for(const check of c.checks){
-      if(!check.construtor)continue
-      visitCheckConditions(check.construtor,condition=>{
-        if(condition.coluna===previous)condition.coluna=column.nome
-        if(condition.origem==='coluna'&&condition.valor===previous)condition.valor=column.nome
-      })
-      check.expressao=compileCheckBuilder(check.construtor,selected.value.colunas)
+    const next=String(name??'').trim()
+    if(!next){
+      if(selected.value.colunas.some(c=>c.checks.some(check=>check.construtor&&builderUsesColumn(check.construtor,column.nome))))throw new Error('Esta coluna é usada em um CHECK e precisa manter um nome.')
+      if(selected.value.uniqueCompostos.some(group=>group.colunas.includes(column.uid)))throw new Error('Esta coluna participa de um UNIQUE composto e precisa manter um nome.')
+      column.nome=''
+      return
     }
+    const edits=[{tableId:selected.value.uid,columnId:column.uid,name:next}]
+    renameColumnsInDocument(JSON.parse(JSON.stringify(doc.value)),edits,renameHelpers)
+    renameColumnsInDocument(doc.value,edits,renameHelpers)
   }
   function addCompositeUnique(ids){
     const table=selected.value
@@ -116,6 +118,9 @@ export const useModelStore=defineStore('modelador',()=>{
   const isUniqueEnabled=c=>isUnique(c)||isCompositeUnique(c)
   const isCheckEnabled=c=>c.checkEnabled||c.checks.length>0
   function setCheck(column,enabled){
+    if(!enabled)for(const check of column.checks){
+      if(check.origemRestricao)updateImportedCheck(selected.value,check)
+    }
     column.checkEnabled=enabled
     if(!enabled)column.checks=[]
   }
@@ -126,12 +131,17 @@ export const useModelStore=defineStore('modelador',()=>{
     if(id){
       const check=column.checks.find(check=>check.uid===id)
       if(!check)throw new Error('Esta restrição CHECK não existe mais.')
+      if(check.origemRestricao)updateImportedCheck(selected.value,check,expressao)
       delete check.construtor
       Object.assign(check,fields)
     }else column.checks.push({uid:makeId(),...fields})
     column.checkEnabled=true
   }
-  function removeCheck(column,id){column.checks=column.checks.filter(check=>check.uid!==id)}
+  function removeCheck(column,id){
+    const check=column.checks.find(item=>item.uid===id)
+    if(check?.origemRestricao)updateImportedCheck(selected.value,check)
+    column.checks=column.checks.filter(item=>item.uid!==id)
+  }
   function clearColumnGroups(column){selected.value.uniqueCompostos=selected.value.uniqueCompostos.filter(group=>!isCompositeOwner(group,column.uid))}
   function setUnique(column,enabled){
     if(column.pk&&primaryKeyColumns.value.length===1)return
@@ -169,19 +179,73 @@ export const useModelStore=defineStore('modelador',()=>{
     column.fkTabela=tableName
   }
   function addColumn(){if(selected.value)selected.value.colunas=orderColumns([...selected.value.colunas,makeColumn()])}
-  function addDefaults(){
-    const t=selected.value
-    if(!t)return
-    const presets=[
-      {nome:'id',tipo:'BIGINT',pk:true,nullable:false,imutavel:true,padrao:'GENERATED BY DEFAULT AS IDENTITY',descricao:'Identificador único automático.'},
-      {nome:'criado_em',tipo:'TIMESTAMPTZ',nullable:false,padrao:'now()',imutavel:true,descricao:'Preenchido na criação do registro. Imutável após o primeiro preenchimento.'},
-      {nome:'atualizado_em',tipo:'TIMESTAMPTZ',nullable:false,padrao:'now()',descricao:'Preenchido na criação e atualizado automaticamente a cada alteração do registro.'}
-    ]
-    for(const p of presets){
-      if(p.pk&&t.colunas.some(c=>c.pk))continue
-      if(!t.colunas.some(c=>c.nome.trim().toLowerCase()===p.nome))t.colunas.push({...makeColumn(),...p})
+  const defaultColumns=[
+    {nome:'id',tipo:'BIGINT',pk:true,unique:true,nullable:false,imutavel:true,padrao:'GENERATED BY DEFAULT AS IDENTITY',descricao:'Identificador único automático.'},
+    {nome:'criado_em',tipo:'TIMESTAMPTZ',pk:false,unique:false,nullable:false,imutavel:true,padrao:'now()',descricao:'Preenchido na criação do registro. Imutável após o primeiro preenchimento.'},
+    {nome:'atualizado_em',tipo:'TIMESTAMPTZ',pk:false,unique:false,nullable:false,imutavel:false,padrao:'now()',descricao:'Preenchido na criação e atualizado automaticamente a cada alteração do registro.'}
+  ]
+  function addDefaults(scope='selected'){
+    if(scope!=='selected'&&scope!=='all')throw new Error('Escopo inválido para as colunas padrão.')
+    const tables=scope==='all'?doc.value.tabelas:selected.value?[selected.value]:[]
+    let created=0,updated=0,skipped=0
+    for(const t of tables){
+      for(const preset of defaultColumns){
+        let col=t.colunas.find(c=>columnName(c)===preset.nome)
+        if(preset.pk&&t.colunas.some(c=>c.pk&&c!==col)){skipped++;continue}
+        if(!col){col=makeColumn(preset.nome,preset.tipo);t.colunas.push(col);created++}
+        else updated++
+        Object.assign(col,preset,{tamanho:'',escala:'',fk:false,fkTabela:'',fkColuna:'id',enumValores:[],enumNome:''})
+      }
+      t.colunas=orderColumns(t.colunas)
     }
-    t.colunas=orderColumns(t.colunas)
+    return {tables:tables.length,created,updated,skipped}
+  }
+  function bulkRenameColumns(ids,find,replacement,matchCase=false){
+    const idsSet=new Set(ids)
+    if(!idsSet.size)throw new Error('Selecione pelo menos uma coluna.')
+    const edits=[]
+    for(const t of doc.value.tabelas)for(const col of t.colunas){
+      if(!idsSet.has(col.uid))continue
+      const name=bulkReplaceName(col.nome,find,replacement,matchCase)
+      if(name!==col.nome)edits.push({tableId:t.uid,columnId:col.uid,name})
+    }
+    if(!edits.length)throw new Error('Nenhuma das colunas selecionadas contém esse trecho.')
+    const draft=JSON.parse(JSON.stringify(doc.value))
+    renameColumnsInDocument(draft,edits,renameHelpers)
+    doc.value=convert(draft)
+    return {changed:edits.length}
+  }
+  function bulkSetColumns(ids,property,value){
+    const allowed=['tipo','nullable','imutavel','padrao']
+    if(!allowed.includes(property))throw new Error('Propriedade não suportada para edição em massa.')
+    if(!ids.length)throw new Error('Selecione pelo menos uma coluna.')
+    const draft=JSON.parse(JSON.stringify(doc.value)),selectedIds=new Set(ids)
+    let changed=0
+    for(const t of draft.tabelas)for(const c of t.colunas){
+      if(!selectedIds.has(c.uid))continue
+      if(property==='tipo'){
+        if(!TYPES.some(([type])=>type===value))throw new Error('Tipo de coluna não suportado.')
+        if(c.fk&&c.tipo!==value)throw new Error('Não é possível trocar o tipo de uma FK em massa. Revise individualmente.')
+        if(c.tipo===value)continue
+        c.tipo=value;c.tamanho='';c.escala='';if(value!=='ENUM'){c.enumValores=[];c.enumNome=''}
+      }else if(property==='nullable'){
+        if(c.pk&&value)throw new Error('Uma coluna PK não pode permitir NULL.')
+        if(c.nullable===value)continue
+        c.nullable=!!value
+      }else if(property==='imutavel'){
+        if(c.pk&&!value)throw new Error('A coluna PK deve continuar imutável no modelador.')
+        if(c.imutavel===value)continue
+        c.imutavel=!!value
+      }else if(property==='padrao'){
+        if(c.fk)throw new Error('Uma FK não aceita valor padrão pelo editor atual.')
+        if(c.padrao===value)continue
+        c.padrao=String(value)
+      }
+      changed++
+    }
+    if(!changed)throw new Error('Nenhuma mudança necessária nas colunas selecionadas.')
+    doc.value=convert(draft)
+    return {changed}
   }
   function moveColumn(id,targetId,after=false){
     const table=selected.value
@@ -201,6 +265,9 @@ export const useModelStore=defineStore('modelador',()=>{
     for(const column of table.colunas){
       const next=column.checks.filter(check=>!check.construtor||!builderUsesColumn(check.construtor,name))
       removed+=column.checks.length-next.length
+      for(const discarded of column.checks.filter(check=>!next.includes(check))){
+        if(discarded.origemRestricao)updateImportedCheck(table,discarded)
+      }
       column.checks=next
     }
     table.uniqueCompostos=table.uniqueCompostos.filter(group=>!group.colunas.includes(id))
@@ -240,7 +307,19 @@ export const useModelStore=defineStore('modelador',()=>{
       target.sqlIndices??=[]
       target.sqlPoliticas??=[]
       for(const col of incoming.colunas){
-        if(target.colunas.some(existing=>identifier(existing.nome)===identifier(col.nome))){skippedColumns++;continue}
+        const existing=target.colunas.find(c=>identifier(c.nome)===identifier(col.nome))
+        if(existing){
+          skippedColumns++
+          existing.checks??=[]
+          // Preserve as regras já editadas, mas importe CHECKs inéditos.
+          for(const check of col.checks||[]){
+            if(!existing.checks.some(c=>c.expressao===check.expressao||c.origemRestricao&&c.origemRestricao===check.origemRestricao)){
+              existing.checks.push(check)
+              existing.checkEnabled=true
+            }
+          }
+          continue
+        }
         target.colunas.push(col);addedColumns++
       }
       appendUnique(target.sqlRestricoes,incoming.sqlRestricoes)
@@ -270,12 +349,41 @@ export const useModelStore=defineStore('modelador',()=>{
     selectedId.value=doc.value.tabelas.find(t=>identifier(t.nome)===identifier(previousSelected))?.uid||doc.value.tabelas[0]?.uid||null
     return {...parsed.resumo,addedTables,addedColumns,skippedColumns,avisos:parsed.avisos}
   }
+  function saveFunctionSql(sql,index=null){
+    const parsed=validateFunctionSql(sql)
+    const current=doc.value.funcoesSql||[]
+    if(index!==null&&(!Number.isInteger(index)||index<0||index>=current.length))throw new Error('Função não encontrada.')
+    const previous=index===null?null:parseFunction(current[index])
+    const same=current.some((existing,i)=>i!==index&&existing.trim()===String(sql).trim())
+    if(same)throw new Error('Esta definição SQL já existe.')
+    if(index===null)doc.value.funcoesSql.push(String(sql).trim())
+    else doc.value.funcoesSql[index]=String(sql).trim()
+    if(previous&&previous.name!==parsed.name&&!current.some((item,i)=>i!==index&&parseFunction(item)?.name===previous.name)){
+      doc.value.regrasSchema=replaceFunctionReference(doc.value.regrasSchema,previous.name,parsed.name)
+      for(const t of doc.value.tabelas){
+        t.regras=replaceFunctionReference(t.regras,previous.name,parsed.name)
+        for(const c of t.colunas)c.descricao=replaceFunctionReference(c.descricao,previous.name,parsed.name)
+      }
+    }
+    return parsed
+  }
+  function removeFunctionSql(index){
+    const functions=doc.value.funcoesSql||[]
+    if(!Number.isInteger(index)||index<0||index>=functions.length)throw new Error('Função não encontrada.')
+    const name=parseFunction(functions[index])?.name
+    const others=functions.filter((_,i)=>i!==index)
+    if(name&&!others.some(sql=>parseFunction(sql)?.name===name)){
+      const texts=[doc.value.regrasSchema,...doc.value.tabelas.flatMap(t=>[t.regras,...t.colunas.map(c=>c.descricao)])]
+      if(texts.some(t=>referencesInText(t,functions).some(ref=>ref.toLowerCase()===name.toLowerCase())))throw new Error('Esta função está referenciada em regras. Remova as referências #'+name+' antes de excluí-la.')
+    }
+    doc.value.funcoesSql.splice(index,1)
+  }
   const exported=computed(()=>({
-    formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
+    formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,regrasSchema:doc.value.regrasSchema,
     ...(doc.value.enums?.length?{enums:doc.value.enums}:{}),
     ...(doc.value.funcoesSql?.length?{funcoesSql:doc.value.funcoesSql}:{}),
     ...(doc.value.comentariosSql?.length?{comentariosSql:doc.value.comentariosSql}:{}),
-    tabelas:sortedTables.value.map(t=>({nome:t.nome,comentario:t.comentario,
+    tabelas:sortedTables.value.map(t=>({nome:t.nome,comentario:t.comentario,regras:t.regras,finalidade:t.finalidade,
       ...(t.sqlRestricoes?.length?{sqlRestricoes:t.sqlRestricoes}:{}),
       ...(t.sqlTriggers?.length?{sqlTriggers:t.sqlTriggers}:{}),
       ...(t.sqlIndices?.length?{sqlIndices:t.sqlIndices}:{}),
@@ -286,5 +394,5 @@ export const useModelStore=defineStore('modelador',()=>{
         ...(formatColumnComment(doc.value.schema,t,c)?{comentario_sql:formatColumnComment(doc.value.schema,t,c)}:{}),
         checks:checks.map(({uid,...check})=>check),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,moveColumn,removeColumn,importData,importSql,exported,addCompositeUnique,removeCompositeUnique}
+  return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,bulkRenameColumns,bulkSetColumns,moveColumn,removeColumn,importData,importSql,exported,addCompositeUnique,removeCompositeUnique,saveFunctionSql,removeFunctionSql}
 })

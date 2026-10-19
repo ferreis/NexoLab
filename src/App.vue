@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useModelStore, TYPES, isDefaultColumn } from './stores/modelador'
 import TableCombobox from './components/TableCombobox.vue'
 import NameInput from './components/NameInput.vue'
@@ -9,13 +9,31 @@ import HelpTooltip from './components/HelpTooltip.vue'
 import CheckEditor from './components/CheckEditor.vue'
 import EnumValuesInput from './components/EnumValuesInput.vue'
 import SqlImportDialog from './components/SqlImportDialog.vue'
-import { formatText } from './textExport.js'
-import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
+import BulkEditDialog from './components/BulkEditDialog.vue'
+import SqlFunctionManager from './components/SqlFunctionManager.vue'
+import SchemaObjectDialog from './components/SchemaObjectDialog.vue'
+import { schemaCategories, schemaEntries } from './schemaNavigation.js'
+import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
+import { formatText, formatTablePreviewText } from './textExport.js'
+import { tablePreview } from './tablePreview.js'
+import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
-const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null)
+const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
+const sidebarCategory=ref('tables')
+const sidebarCategories=computed(()=>schemaCategories(store.doc))
+const sidebarEntries=computed(()=>schemaEntries(store.doc,sidebarCategory.value))
+function selectSidebarEntry(entry){
+  if(sidebarCategory.value==='tables'){store.selectedId=entry.tableId;collapseSelectedTable();return}
+  if(sidebarCategory.value==='functions'){functionDialog.value?.open(entry.label);return}
+  objectDialog.value?.open(sidebarCategory.value,entry)
+}
+function addSidebarItem(){
+  if(sidebarCategory.value==='tables')store.addTable()
+  else if(sidebarCategory.value==='functions')functionDialog.value?.create()
+}
 const previewScope=ref('all'), formatOpen=ref(false)
 const scopeAll=ref(null), scopeTable=ref(null)
 function selectScope(scope){
@@ -62,6 +80,12 @@ async function moveWithKeyboard(event,column){
   }
 }
 const collapsed=ref(new Set())
+function collapseSelectedTable(){
+  collapsed.value=new Set((store.selected?.colunas||[]).map(column=>column.uid))
+}
+// Ao abrir uma tabela, inclusive a primeira carregada ou uma tabela importada,
+// todas as colunas começam recolhidas. Alterar outras propriedades não reinicia a expansão.
+watch(()=>store.selected,collapseSelectedTable,{immediate:true})
 const allColumnsCollapsed=computed(()=>store.columns.length>0&&store.columns.every(c=>collapsed.value.has(c.uid)))
 function toggleAllColumns(){
   const expand=allColumnsCollapsed.value
@@ -77,8 +101,15 @@ function collapseDefaults(){
   for(const table of store.doc.tabelas)for(const column of table.colunas)if(isDefaultColumn(column))next.add(column.uid)
   collapsed.value=next
 }
-collapseDefaults()
-function addDefaults(){store.addDefaults();collapseDefaults()}
+function addDefaults(){const result=store.addDefaults('selected');collapseDefaults();toast(`Padrões aplicados: ${result.created} criadas, ${result.updated} atualizadas.`)}
+async function addDefaultsAll(){
+  if(!store.doc.tabelas.length)return
+  if(!await askConfirmation({title:'Aplicar padrões em todas as tabelas?',message:'Isso cria ou atualiza id, criado_em e atualizado_em em todas as tabelas. Tipos, valores padrão, imutabilidade e regras dessas três colunas serão padronizados. Se outra coluna já for PK, a coluna id dessa tabela será mantida.',action:'Aplicar padrões'}))return
+  const result=store.addDefaults('all')
+  collapseDefaults()
+  toast(`Padrões em ${result.tables} tabelas: ${result.created} criadas, ${result.updated} atualizadas, ${result.skipped} ignoradas.`)
+}
+function bulkApplied(result){collapseDefaults();toast(`${result.changed} coluna(s) alterada(s).`)}
 const confirmation=ref(null), confirmationDialog=ref(null)
 async function askConfirmation(options){
   if(confirmation.value)return false
@@ -104,9 +135,9 @@ const json=computed(()=>JSON.stringify(store.exported,null,2))
 const previewData=computed(()=>{
   if(previewScope.value==='all')return store.exported
   const index=store.sortedTables.findIndex(t=>t.uid===store.selectedId)
-  return {...store.exported,tabelas:index<0?[]:[store.exported.tabelas[index]]}
+  return tablePreview(store.exported,index)
 })
-const previewContent=computed(()=>tab.value==='txt'?formatText(previewData.value):JSON.stringify(previewData.value,null,2))
+const previewContent=computed(()=>tab.value==='txt'?(previewScope.value==='table'?formatTablePreviewText(previewData.value):formatText(previewData.value)):JSON.stringify(previewData.value,null,2))
 const previewCopyLabel=computed(()=>previewScope.value==='all'?'Copiar tudo':'Copiar tabela atual')
 function sqlImported(summary,mode){collapseDefaults();toast(mode==='merge'?`SQL mesclado: ${summary.addedTables} tabelas e ${summary.addedColumns} colunas adicionadas.`:`SQL importado: ${summary.tabelas} tabelas carregadas.`)}
 async function importJson(e){const f=e.target.files?.[0];if(!f)return;try{const data=JSON.parse(await f.text());if(store.doc.tabelas.length&&!await askConfirmation({title:'Substituir projeto?',message:'As tabelas do projeto atual serão substituídas pelo arquivo importado. Exporte o projeto antes se quiser guardar uma cópia.',action:'Substituir projeto'}))return;store.importData(data);collapseDefaults();toast('Projeto importado.')}catch(err){toast('Erro ao importar: '+err.message)}finally{e.target.value=''}}
@@ -132,6 +163,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
     <div class="top-actions">
       <button class="btn ghost" @click="fileInput?.click()"><Upload :size="15"/> Importar JSON</button>
       <button class="btn ghost" @click="sqlDialog?.open()"><Upload :size="15"/> Importar SQL</button>
+      <button class="btn ghost" @click="functionDialog?.open()"><Code2 :size="15"/> Funções SQL</button>
+      <button class="btn ghost" :disabled="!store.doc.tabelas.length" @click="bulkDialog?.open()"><Copy :size="15"/> Edição em massa</button>
       <button class="btn" :disabled="!!store.nameError" @click="download('modelo-banco.json',json,'application/json')"><FileJson :size="15"/> JSON</button>
       <button class="btn primary" :disabled="!!store.nameError" @click="download('modelo-banco.txt',txt,'text/plain')"><Download :size="15"/> TXT</button>
       <input ref="fileInput" type="file" accept=".json,application/json" hidden @change="importJson"/>
@@ -141,21 +174,43 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
     <aside class="sidebar panel" :class="{collapsed:!leftOpen}">
       <button v-if="!leftOpen" class="dock-toggle" :title="leftOpen?'Recolher tabelas':'Expandir tabelas'" @click="leftOpen=!leftOpen"><PanelLeftClose v-if="leftOpen" :size="18"/><PanelLeftOpen v-else :size="18"/></button>
       <template v-if="leftOpen">
-        <div class="sidehead"><h2>Tabelas <span class="subtle">({{store.doc.tabelas.length}})</span></h2><div class="panel-actions"><button class="iconbtn" title="Criar tabela" @click="store.addTable()"><Plus :size="18"/></button><button class="iconbtn" title="Recolher tabelas" aria-label="Recolher tabelas" @click="leftOpen=false"><PanelLeftClose :size="18"/></button></div></div>
-        <label>Projeto<input v-model="store.doc.projeto" placeholder="Nome do projeto"/></label>
+        <div class="sidehead">
+          <div class="sidebar-category">
+            <select v-model="sidebarCategory" aria-label="Selecionar categoria de objetos do schema" title="Escolher Tabelas, ENUMs, Triggers ou Functions">
+              <option v-for="category in sidebarCategories" :key="category.value" :value="category.value">{{category.label}} ({{category.count}})</option>
+            </select>
+            <ChevronDown :size="14" aria-hidden="true"/>
+          </div>
+          <div class="panel-actions">
+            <button v-if="sidebarCategory==='tables'||sidebarCategory==='functions'" class="iconbtn" :title="sidebarCategory==='tables'?'Criar tabela':'Criar função SQL'" :aria-label="sidebarCategory==='tables'?'Criar tabela':'Criar função SQL'" @click="addSidebarItem"><Plus :size="18"/></button>
+            <button class="iconbtn" title="Recolher barra lateral" aria-label="Recolher barra lateral" @click="leftOpen=false"><PanelLeftClose :size="18"/></button>
+          </div>
+        </div>
         <label>Schema<input v-model="store.doc.schema" placeholder="rpg"/></label>
-        <details v-if="store.doc.enums?.length||store.doc.funcoesSql?.length||store.doc.comentariosSql?.length" class="sql-schema-info">
-          <summary>Objetos SQL ({{store.doc.enums?.length||0}} enums, {{store.doc.funcoesSql?.length||0}} funções, {{store.doc.comentariosSql?.length||0}} comentários)</summary>
-          <details v-for="item in store.doc.enums" :key="item.schema+'.'+item.nome"><summary>ENUM {{item.nome}}</summary><pre>{{item.valores.join(', ')}}</pre></details>
-          <details v-for="(sql,i) in store.doc.funcoesSql" :key="i"><summary>Função {{i+1}}</summary><pre>{{sql}}</pre></details>
+        <label>Regras do schema<FunctionMentionTextarea v-model="store.doc.regrasSchema" :functions="store.doc.funcoesSql" :rows="3" @open-function="name=>functionDialog?.open(name)"/></label>
+        <details v-if="store.doc.comentariosSql?.length" class="sql-schema-info">
+          <summary>Comentários SQL ({{store.doc.comentariosSql.length}})</summary>
           <details v-for="(sql,i) in store.doc.comentariosSql" :key="'comment'+i"><summary>Comentário SQL {{i+1}}</summary><pre>{{sql}}</pre></details>
         </details>
-        <nav class="tablelist">
-          <button v-for="t in store.sortedTables" :key="t.uid" class="tablebtn" :title="t.nome||'Sem nome'" :class="{active:store.selectedId===t.uid}" @click="store.selectedId=t.uid">
-            <Database :size="15"/><span>{{t.nome||'Sem nome'}}</span><small>{{t.colunas.length}}</small>
+        <nav :key="sidebarCategory" class="tablelist" :aria-label="'Lista de '+sidebarCategories.find(c=>c.value===sidebarCategory)?.label">
+          <button v-for="entry in sidebarEntries" :key="entry.key" class="tablebtn" :title="entry.tableName?entry.label+' · '+entry.tableName:entry.label" :class="{active:sidebarCategory==='tables'&&store.selectedId===entry.tableId}" @click="selectSidebarEntry(entry)">
+            <Database v-if="sidebarCategory==='tables'" :size="15"/>
+            <List v-else-if="sidebarCategory==='enums'" :size="15"/>
+            <Workflow v-else-if="sidebarCategory==='triggers'" :size="15"/>
+            <Code2 v-else :size="15"/>
+            <span>{{entry.label}}</span>
+            <small v-if="sidebarCategory==='tables'||sidebarCategory==='enums'">{{entry.count}}</small>
+            <small v-else-if="sidebarCategory==='triggers'" class="sidebar-table-tag">{{entry.tableName}}</small>
           </button>
+          <p v-if="!sidebarEntries.length" class="sidebar-empty">Nenhum item nesta categoria.</p>
         </nav>
-        <button class="btn primary full" @click="store.addTable()"><Plus :size="16"/> Nova tabela</button>
+        <div v-if="sidebarCategory==='tables'" class="table-side-actions">
+          <button class="btn primary full" @click="store.addTable()"><Plus :size="16"/> Nova tabela</button>
+          <button class="btn full" :disabled="!store.doc.tabelas.length" @click="addDefaultsAll"><Plus :size="16"/> Padrões em todas as tabelas</button>
+        </div>
+        <div v-else-if="sidebarCategory==='functions'" class="table-side-actions">
+          <button class="btn primary full" @click="functionDialog?.create()"><Plus :size="16"/> Nova função SQL</button>
+        </div>
       </template>
     </aside>
     <main class="editor panel">
@@ -164,7 +219,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button></div>
         <div class="formgrid">
           <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)"/></label>
-          <label>Comentário<textarea v-model="store.selected.comentario" rows="3" placeholder="Explique a finalidade ou as regras desta tabela."/></label>
+          <label>Comentário<textarea v-model="store.selected.comentario" rows="3" placeholder="Explique a finalidade desta tabela."/></label>
+          <label>Regras da tabela<FunctionMentionTextarea v-model="store.selected.regras" :functions="store.doc.funcoesSql" :rows="3" @open-function="name=>functionDialog?.open(name)"/></label>
         </div>
         <details v-if="store.selected.sqlRestricoes?.length||store.selected.sqlTriggers?.length||store.selected.sqlIndices?.length||store.selected.sqlPoliticas?.length" class="sql-table-info">
           <summary>Definições SQL importadas ({{(store.selected.sqlRestricoes?.length||0)+(store.selected.sqlTriggers?.length||0)+(store.selected.sqlIndices?.length||0)+(store.selected.sqlPoliticas?.length||0)}})</summary>
@@ -216,7 +272,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, separados por Enter ou vírgula<EnumValuesInput :key="c.uid" v-model="c.enumValores"/></label>
             <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :ref="instance=>registerEditor(uniqueEditors,c.uid,instance)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
             <CheckEditor v-if="store.isCheckEnabled(c)" :ref="instance=>registerEditor(checkEditors,c.uid,instance)" :column="c" :columns="store.selected.colunas" :save="(id,expression,builder)=>store.saveCheck(c,id,expression,builder)" :remove="id=>store.removeCheck(c,id)"/>
-            <label>Regra<textarea v-model="c.descricao" rows="2"/></label>
+            <label>Regra<FunctionMentionTextarea v-model="c.descricao" :functions="store.doc.funcoesSql" :rows="2" @open-function="name=>functionDialog?.open(name)"/></label>
             <label>Comentário<textarea v-model="c.comentario" rows="3" placeholder="Explique o significado desta coluna."/></label>
           </div>
         </article>
@@ -246,6 +302,9 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
     </aside>
   </div>
   <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
+  <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>
+  <SqlFunctionManager ref="functionDialog"/>
+  <SchemaObjectDialog ref="objectDialog" @select-table="sidebarCategory='tables'"/>
   <dialog ref="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-description" @cancel.prevent="closeConfirmation(false)">
     <template v-if="confirmation">
       <div class="confirmation-icon"><Info :size="22"/></div>
