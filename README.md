@@ -20,6 +20,9 @@ O campo **Comentário**, abaixo do nome da tabela, aceita explicações em vári
 
 Cada coluna também possui um campo **Comentário**, separado de **Regra**. O JSON da coluna guarda `comentario` e o comando gerado em `comentario_sql`; o TXT apresenta `COMMENT ON COLUMN "schema"."tabela"."coluna" IS 'texto';` logo após a linha da coluna. O comentário acompanha renomeações de schema, tabela e coluna, com a mesma preservação de texto e escape usados nos comentários de tabela.
 
+
+A opção **Tabela** na prévia TXT/JSON mostra somente a tabela selecionada, suas colunas e suas restrições, triggers, índices e políticas específicas. Objetos globais do schema (ENUMs, funções e comentários gerais) aparecem apenas na opção **Esquema**.
+
 ## Edição em massa e refatoração de FKs
 
 O botão **Edição em massa** fica no cabeçalho do modelador. Pesquise por tabela ou nome de coluna, marque os resultados individualmente ou use **Selecionar resultados**, e escolha uma alteração: **substituir trecho no nome**, **alterar tipo de dado**, **Permite NULL**, **Imutável** ou **Valor padrão**. A renomeação mostra o valor anterior e o novo nome antes da confirmação. Operações que gerariam nomes duplicados são recusadas sem alterar o documento.
