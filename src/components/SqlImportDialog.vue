@@ -91,7 +91,7 @@ defineExpose({open})
       </fieldset>
       <div v-if="preview" class="sql-import-summary" aria-live="polite">
         <strong>Prévia do SQL analisado ({{preview.schema_alvo}})</strong>
-        <p>{{preview.resumo.tabelas}} tabelas · {{preview.resumo.colunas}} colunas · {{preview.resumo.restricoes}} restrições · {{preview.resumo.triggers}} triggers · {{preview.resumo.enums}} enums · {{preview.resumo.funcoes}} funções</p>
+        <p>{{preview.resumo.tabelas}} tabelas · {{preview.resumo.colunas}} colunas · {{preview.resumo.restricoes}} restrições · {{preview.resumo.triggers}} triggers · {{preview.resumo.enums}} enums · {{preview.resumo.funcoes}} funções · {{preview.resumo.politicas}} políticas/RLS</p>
         <details v-if="preview.avisos.length"><summary><AlertTriangle :size="14"/> {{preview.avisos.length}} avisos sobre tipos ou comandos adicionais</summary>
           <ul><li v-for="(warning,i) in preview.avisos.slice(0,12)" :key="i">{{warning}}</li></ul>
           <p v-if="preview.avisos.length>12">Outros {{preview.avisos.length-12}} avisos omitidos nesta prévia.</p>
