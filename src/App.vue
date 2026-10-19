@@ -165,11 +165,12 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)"/></label>
           <label>Comentário<textarea v-model="store.selected.comentario" rows="3" placeholder="Explique a finalidade ou as regras desta tabela."/></label>
         </div>
-        <details v-if="store.selected.sqlRestricoes?.length||store.selected.sqlTriggers?.length||store.selected.sqlIndices?.length" class="sql-table-info">
-          <summary>Definições SQL importadas ({{(store.selected.sqlRestricoes?.length||0)+(store.selected.sqlTriggers?.length||0)+(store.selected.sqlIndices?.length||0)}})</summary>
+        <details v-if="store.selected.sqlRestricoes?.length||store.selected.sqlTriggers?.length||store.selected.sqlIndices?.length||store.selected.sqlPoliticas?.length" class="sql-table-info">
+          <summary>Definições SQL importadas ({{(store.selected.sqlRestricoes?.length||0)+(store.selected.sqlTriggers?.length||0)+(store.selected.sqlIndices?.length||0)+(store.selected.sqlPoliticas?.length||0)}})</summary>
           <div v-if="store.selected.sqlRestricoes?.length"><h3>Restrições (PK, FK, UNIQUE, CHECK)</h3><pre v-for="(item,i) in store.selected.sqlRestricoes" :key="'constraint'+i">{{item}}</pre></div>
           <div v-if="store.selected.sqlTriggers?.length"><h3>Triggers</h3><pre v-for="(item,i) in store.selected.sqlTriggers" :key="'trigger'+i">{{item}}</pre></div>
           <div v-if="store.selected.sqlIndices?.length"><h3>Índices</h3><pre v-for="(item,i) in store.selected.sqlIndices" :key="'index'+i">{{item}}</pre></div>
+          <div v-if="store.selected.sqlPoliticas?.length"><h3>Políticas e RLS</h3><pre v-for="(item,i) in store.selected.sqlPoliticas" :key="'policy'+i">{{item}}</pre></div>
         </details>
         <div class="sectionhead columnsheading"><h2>Colunas <span class="subtle">({{store.selected.colunas.length}})</span></h2><div class="buttons"><button class="btn" :disabled="!store.columns.length" @click="toggleAllColumns"><ChevronDown v-if="allColumnsCollapsed" :size="15"/><ChevronUp v-else :size="15"/>{{allColumnsCollapsed?'Expandir todas':'Recolher todas'}}</button><button class="btn" @click="addDefaults"><Plus :size="15"/> ID e datas padrão</button><button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Coluna</button></div></div>
         <div v-if="!store.selected.colunas.length" class="empty">Nenhuma coluna cadastrada. Use <strong>ID e datas padrão</strong> ou adicione uma coluna.</div>
