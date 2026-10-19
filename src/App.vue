@@ -10,13 +10,15 @@ import CheckEditor from './components/CheckEditor.vue'
 import EnumValuesInput from './components/EnumValuesInput.vue'
 import SqlImportDialog from './components/SqlImportDialog.vue'
 import BulkEditDialog from './components/BulkEditDialog.vue'
-import { formatText } from './textExport.js'
+import SqlFunctionManager from './components/SqlFunctionManager.vue'
+import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
+import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
-import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
+import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2 } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
-const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null)
+const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const previewScope=ref('all'), formatOpen=ref(false)
 const scopeAll=ref(null), scopeTable=ref(null)
@@ -116,7 +118,7 @@ const previewData=computed(()=>{
   const index=store.sortedTables.findIndex(t=>t.uid===store.selectedId)
   return tablePreview(store.exported,index)
 })
-const previewContent=computed(()=>tab.value==='txt'?formatText(previewData.value):JSON.stringify(previewData.value,null,2))
+const previewContent=computed(()=>tab.value==='txt'?(previewScope.value==='table'?formatTablePreviewText(previewData.value):formatText(previewData.value)):JSON.stringify(previewData.value,null,2))
 const previewCopyLabel=computed(()=>previewScope.value==='all'?'Copiar tudo':'Copiar tabela atual')
 function sqlImported(summary,mode){collapseDefaults();toast(mode==='merge'?`SQL mesclado: ${summary.addedTables} tabelas e ${summary.addedColumns} colunas adicionadas.`:`SQL importado: ${summary.tabelas} tabelas carregadas.`)}
 async function importJson(e){const f=e.target.files?.[0];if(!f)return;try{const data=JSON.parse(await f.text());if(store.doc.tabelas.length&&!await askConfirmation({title:'Substituir projeto?',message:'As tabelas do projeto atual serão substituídas pelo arquivo importado. Exporte o projeto antes se quiser guardar uma cópia.',action:'Substituir projeto'}))return;store.importData(data);collapseDefaults();toast('Projeto importado.')}catch(err){toast('Erro ao importar: '+err.message)}finally{e.target.value=''}}
@@ -142,6 +144,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
     <div class="top-actions">
       <button class="btn ghost" @click="fileInput?.click()"><Upload :size="15"/> Importar JSON</button>
       <button class="btn ghost" @click="sqlDialog?.open()"><Upload :size="15"/> Importar SQL</button>
+      <button class="btn ghost" @click="functionDialog?.open()"><Code2 :size="15"/> Funções SQL</button>
       <button class="btn ghost" :disabled="!store.doc.tabelas.length" @click="bulkDialog?.open()"><Copy :size="15"/> Edição em massa</button>
       <button class="btn" :disabled="!!store.nameError" @click="download('modelo-banco.json',json,'application/json')"><FileJson :size="15"/> JSON</button>
       <button class="btn primary" :disabled="!!store.nameError" @click="download('modelo-banco.txt',txt,'text/plain')"><Download :size="15"/> TXT</button>
@@ -155,6 +158,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div class="sidehead"><h2>Tabelas <span class="subtle">({{store.doc.tabelas.length}})</span></h2><div class="panel-actions"><button class="iconbtn" title="Criar tabela" @click="store.addTable()"><Plus :size="18"/></button><button class="iconbtn" title="Recolher tabelas" aria-label="Recolher tabelas" @click="leftOpen=false"><PanelLeftClose :size="18"/></button></div></div>
         <label>Projeto<input v-model="store.doc.projeto" placeholder="Nome do projeto"/></label>
         <label>Schema<input v-model="store.doc.schema" placeholder="rpg"/></label>
+        <label>Regras do schema<FunctionMentionTextarea v-model="store.doc.regrasSchema" :functions="store.doc.funcoesSql" :rows="3"/></label>
         <details v-if="store.doc.enums?.length||store.doc.funcoesSql?.length||store.doc.comentariosSql?.length" class="sql-schema-info">
           <summary>Objetos SQL ({{store.doc.enums?.length||0}} enums, {{store.doc.funcoesSql?.length||0}} funções, {{store.doc.comentariosSql?.length||0}} comentários)</summary>
           <details v-for="item in store.doc.enums" :key="item.schema+'.'+item.nome"><summary>ENUM {{item.nome}}</summary><pre>{{item.valores.join(', ')}}</pre></details>
@@ -178,7 +182,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button></div>
         <div class="formgrid">
           <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)"/></label>
-          <label>Comentário<textarea v-model="store.selected.comentario" rows="3" placeholder="Explique a finalidade ou as regras desta tabela."/></label>
+          <label>Comentário<textarea v-model="store.selected.comentario" rows="3" placeholder="Explique a finalidade desta tabela."/></label>
+          <label>Regras da tabela<FunctionMentionTextarea v-model="store.selected.regras" :functions="store.doc.funcoesSql" :rows="3"/></label>
         </div>
         <details v-if="store.selected.sqlRestricoes?.length||store.selected.sqlTriggers?.length||store.selected.sqlIndices?.length||store.selected.sqlPoliticas?.length" class="sql-table-info">
           <summary>Definições SQL importadas ({{(store.selected.sqlRestricoes?.length||0)+(store.selected.sqlTriggers?.length||0)+(store.selected.sqlIndices?.length||0)+(store.selected.sqlPoliticas?.length||0)}})</summary>
@@ -230,7 +235,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, separados por Enter ou vírgula<EnumValuesInput :key="c.uid" v-model="c.enumValores"/></label>
             <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :ref="instance=>registerEditor(uniqueEditors,c.uid,instance)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
             <CheckEditor v-if="store.isCheckEnabled(c)" :ref="instance=>registerEditor(checkEditors,c.uid,instance)" :column="c" :columns="store.selected.colunas" :save="(id,expression,builder)=>store.saveCheck(c,id,expression,builder)" :remove="id=>store.removeCheck(c,id)"/>
-            <label>Regra<textarea v-model="c.descricao" rows="2"/></label>
+            <label>Regra<FunctionMentionTextarea v-model="c.descricao" :functions="store.doc.funcoesSql" :rows="2"/></label>
             <label>Comentário<textarea v-model="c.comentario" rows="3" placeholder="Explique o significado desta coluna."/></label>
           </div>
         </article>
@@ -261,6 +266,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
   </div>
   <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
   <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>
+  <SqlFunctionManager ref="functionDialog"/>
   <dialog ref="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-description" @cancel.prevent="closeConfirmation(false)">
     <template v-if="confirmation">
       <div class="confirmation-icon"><Info :size="22"/></div>
