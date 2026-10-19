@@ -158,7 +158,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div class="sidehead"><h2>Tabelas <span class="subtle">({{store.doc.tabelas.length}})</span></h2><div class="panel-actions"><button class="iconbtn" title="Criar tabela" @click="store.addTable()"><Plus :size="18"/></button><button class="iconbtn" title="Recolher tabelas" aria-label="Recolher tabelas" @click="leftOpen=false"><PanelLeftClose :size="18"/></button></div></div>
         <label>Projeto<input v-model="store.doc.projeto" placeholder="Nome do projeto"/></label>
         <label>Schema<input v-model="store.doc.schema" placeholder="rpg"/></label>
-        <label>Regras do schema<FunctionMentionTextarea v-model="store.doc.regrasSchema" :functions="store.doc.funcoesSql" :rows="3"/></label>
+        <label>Regras do schema<FunctionMentionTextarea v-model="store.doc.regrasSchema" :functions="store.doc.funcoesSql" :rows="3" @open-function="name=>functionDialog?.open(name)"/></label>
         <details v-if="store.doc.enums?.length||store.doc.funcoesSql?.length||store.doc.comentariosSql?.length" class="sql-schema-info">
           <summary>Objetos SQL ({{store.doc.enums?.length||0}} enums, {{store.doc.funcoesSql?.length||0}} funções, {{store.doc.comentariosSql?.length||0}} comentários)</summary>
           <details v-for="item in store.doc.enums" :key="item.schema+'.'+item.nome"><summary>ENUM {{item.nome}}</summary><pre>{{item.valores.join(', ')}}</pre></details>
@@ -183,7 +183,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div class="formgrid">
           <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)"/></label>
           <label>Comentário<textarea v-model="store.selected.comentario" rows="3" placeholder="Explique a finalidade desta tabela."/></label>
-          <label>Regras da tabela<FunctionMentionTextarea v-model="store.selected.regras" :functions="store.doc.funcoesSql" :rows="3"/></label>
+          <label>Regras da tabela<FunctionMentionTextarea v-model="store.selected.regras" :functions="store.doc.funcoesSql" :rows="3" @open-function="name=>functionDialog?.open(name)"/></label>
         </div>
         <details v-if="store.selected.sqlRestricoes?.length||store.selected.sqlTriggers?.length||store.selected.sqlIndices?.length||store.selected.sqlPoliticas?.length" class="sql-table-info">
           <summary>Definições SQL importadas ({{(store.selected.sqlRestricoes?.length||0)+(store.selected.sqlTriggers?.length||0)+(store.selected.sqlIndices?.length||0)+(store.selected.sqlPoliticas?.length||0)}})</summary>
@@ -235,7 +235,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
             <label v-if="c.tipo==='ENUM'">Valores do ENUM, separados por Enter ou vírgula<EnumValuesInput :key="c.uid" v-model="c.enumValores"/></label>
             <CompositeUniqueEditor v-if="store.isCompositeUnique(c)" :ref="instance=>registerEditor(uniqueEditors,c.uid,instance)" :table="store.selected" :column="c" :add="store.addCompositeUnique" :remove="store.removeCompositeUnique"/>
             <CheckEditor v-if="store.isCheckEnabled(c)" :ref="instance=>registerEditor(checkEditors,c.uid,instance)" :column="c" :columns="store.selected.colunas" :save="(id,expression,builder)=>store.saveCheck(c,id,expression,builder)" :remove="id=>store.removeCheck(c,id)"/>
-            <label>Regra<FunctionMentionTextarea v-model="c.descricao" :functions="store.doc.funcoesSql" :rows="2"/></label>
+            <label>Regra<FunctionMentionTextarea v-model="c.descricao" :functions="store.doc.funcoesSql" :rows="2" @open-function="name=>functionDialog?.open(name)"/></label>
             <label>Comentário<textarea v-model="c.comentario" rows="3" placeholder="Explique o significado desta coluna."/></label>
           </div>
         </article>
