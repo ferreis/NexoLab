@@ -117,8 +117,8 @@ export function renameColumnsInDocument(doc,edits,helpers={}){
       }
     }
   }
-  const error=duplicateNameError(doc.tabelas)
-  if(error)throw new Error(error)
+  // Duplicidades pré-existentes em outras tabelas não bloqueiam sua correção.
+  // Cada tabela afetada já foi validada antes da aplicação.
   return changed
 }
 
