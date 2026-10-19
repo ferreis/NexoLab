@@ -225,3 +225,48 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
  .sql-import-modes { grid-template-columns: 1fr; }
  .sql-import-footer .btn { flex: 1; }
 }
+
+
+/* Editor de operações em massa, com busca e prévia. */
+.table-side-actions { display: grid; gap: 8px; }
+.bulk-edit-dialog { width: min(930px, calc(100% - 28px)); max-height: min(94dvh, 990px); overflow-y: auto; padding: 0; border: 1px solid #41506a; border-radius: 12px; background: var(--surface); color: #e3e9f2; }
+.bulk-edit-dialog::backdrop { background: #080c16c4; backdrop-filter: blur(3px); }
+.bulk-edit-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 22px 24px 17px; border-bottom: 1px solid var(--line); }
+.bulk-edit-header h2 { display:flex; align-items:center; gap:10px; margin:0; font-size:19px; }
+.bulk-edit-header h2 svg { color:var(--accent); }
+.bulk-edit-header p { color:var(--muted); font-size:12px; line-height:1.6; margin:8px 0 0; }
+.bulk-edit-content { display:grid; gap:13px; padding:18px 24px; }
+.bulk-edit-search { display:flex; align-items:center; gap:9px; background:var(--input); border:1px solid var(--line); padding:0 12px; border-radius:8px; }
+.bulk-edit-search:focus-within { border-color:var(--accent); }
+.bulk-edit-search input { width:100%; min-height:43px; border:0; outline:0; background:transparent; color:inherit; font-size:13px; }
+.bulk-edit-selectline { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+.bulk-edit-selectline span { font-size:12px; color:var(--muted); }
+.bulk-edit-list { max-height:240px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+.bulk-edit-item { display:flex; align-items:center; gap:12px; padding:10px 13px; border-bottom:1px solid var(--line); cursor:pointer; font-size:12px; }
+.bulk-edit-item:last-child { border-bottom:0; }
+.bulk-edit-item:hover { background:#242d3b; }
+.bulk-edit-item input { flex-shrink:0; accent-color:var(--accent); }
+.bulk-edit-item-name { flex:1; overflow-wrap:anywhere; min-width:0; color:#b5c0d2; }
+.bulk-edit-item-name strong { color:#eef2fb; }
+.bulk-edit-item small { color:var(--muted); white-space:nowrap; }
+.bulk-edit-noresults { text-align:center; padding:15px; color:var(--muted); font-size:12px; }
+.bulk-edit-fields { display:grid; gap:11px; border:1px solid var(--line); border-radius:8px; padding:14px; margin:0; }
+.bulk-edit-fields legend { font-size:12px; font-weight:600; }
+.bulk-edit-fields label:not(.bulk-edit-tick) { display:grid; gap:7px; color:#cbd6e4; font-size:12px; }
+.bulk-edit-fields input:not([type=checkbox]), .bulk-edit-fields select { display:block; min-width:0; width:100%; min-height:38px; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--input); color:#f1f4fb; }
+.bulk-edit-dual { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.bulk-edit-tick { display:flex; align-items:flex-start; gap:9px; color:#cbd6e4; font-size:12px; line-height:1.6; }
+.bulk-edit-tick input { margin-top:3px; accent-color:var(--accent); }
+.bulk-edit-preview { display:grid; gap:7px; padding:12px; border:1px solid var(--line); border-radius:7px; background:var(--input); max-height:230px; overflow:auto; font-size:12px; }
+.bulk-edit-preview > div { display:flex; gap:12px; align-items:flex-start; overflow-wrap:anywhere; border-bottom:1px solid #29364a; padding:5px 0; }
+.bulk-edit-preview > div span:first-child { flex:1; color:var(--muted); }
+.bulk-edit-preview > div strong { flex:1; color:#e7e0ff; }
+.bulk-edit-preview p, .bulk-edit-preview small { color:var(--muted); margin:0; }
+.bulk-edit-confirm { border-top:1px solid var(--line); padding-top:13px; }
+.bulk-edit-footer { position:sticky; bottom:0; display:flex; justify-content:flex-end; gap:10px; padding:15px 24px; border-top:1px solid var(--line); background:var(--surface); }
+@media (max-width:767px) {
+  .bulk-edit-dialog { width:calc(100% - 12px); max-height:96dvh; }
+  .bulk-edit-header,.bulk-edit-content,.bulk-edit-footer { padding-left:15px; padding-right:15px; }
+  .bulk-edit-dual { grid-template-columns:1fr; }
+  .bulk-edit-footer button { flex:1; }
+}
