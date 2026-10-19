@@ -227,5 +227,5 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
     avisos:arrayUnique(warnings),
     resumo:{tabelas:tables.length,colunas:tables.reduce((n,t)=>n+t.colunas.length,0),
       enums:enums.filter(e=>norm(e.schema)===norm(schema)).length,funcoes:functions.length,
-      triggers:tables.reduce((n,t)=>n+t.sqlTriggers.length,0),politicas:tables.reduce((n,t)=>n+t.sqlPoliticas.length,0),comentarios:comentariosSql.length,restricoes:tables.reduce((n,t)=>n+t.sqlRestricoes.length,0)}}
+      triggers:tables.reduce((n,t)=>n+t.sqlTriggers.length,0),politicas:tables.reduce((n,t)=>n+t.sqlPoliticas.length,0),comentarios:comentariosSql.length,restricoes:tables.reduce((n,t)=>n+t.sqlRestricoes.length,0),checks:tables.reduce((n,t)=>n+t.colunas.reduce((sum,c)=>sum+c.checks.length,0),0)}}
 }
