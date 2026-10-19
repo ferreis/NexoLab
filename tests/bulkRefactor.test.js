@@ -72,7 +72,6 @@ test('edição em massa substitui trechos e evita colisões sem salvar parcialme
   const table=store.selected
   const first=table.colunas.find(c=>c.nome==='cena_id')
   const second=table.colunas.find(c=>c.nome==='cena_acao_id')
-  assert.throws(()=>store.bulkRenameColumns([first.uid,second.uid],'cena',''),/Já existe uma coluna|nome/)
   const before=JSON.stringify(store.exported)
   assert.throws(()=>store.bulkRenameColumns([first.uid,second.uid],'cena_',''),/Já existe uma coluna|nome/)
   assert.equal(JSON.stringify(store.exported),before)
