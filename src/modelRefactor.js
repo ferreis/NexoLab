@@ -162,3 +162,24 @@ export function bulkReplaceName(name,find,replacement,matchCase=false){
   const escaped=find.replace(/[|\\{}()[\]^$+*?.]/g,'\\$&')
   return name.replace(new RegExp(escaped,matchCase?'g':'gi'),replacement)
 }
+
+
+export function updateImportedCheck(table,check,newExpression=null){
+  const origin=check.origemRestricao
+  if(!origin)return
+  const index=table.sqlRestricoes?.indexOf(origin)??-1
+  if(index<0)throw new Error('Não foi encontrada a definição SQL original deste CHECK.')
+  if(newExpression===null){
+    table.sqlRestricoes.splice(index,1)
+    return
+  }
+  const match=/\bCHECK\s*\(/i.exec(origin)
+  if(!match)throw new Error('Não foi possível localizar a expressão do CHECK importado.')
+  const start=match.index+match[0].length,oldExpression=check.expressao
+  if(origin.slice(start,start+oldExpression.length)!==oldExpression){
+    throw new Error('A restrição original divergiu do CHECK editável.')
+  }
+  const updated=origin.slice(0,start)+newExpression+origin.slice(start+oldExpression.length)
+  table.sqlRestricoes[index]=updated
+  check.origemRestricao=updated
+}
