@@ -1,0 +1,128 @@
+name: Limpar historico do Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cleanup-cloudflare-pages-nexodblab
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Excluir deployments antigos sem afetar a producao
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: "0202132875af020266de25bde0a644be"
+          CF_PROJECT_NAME: "nexodblab"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
+          if not token:
+              sys.exit("Configure o secret CLOUDFLARE_API_TOKEN no GitHub (token com permissao Cloudflare Pages:Edit).")
+
+          base = (
+              "https://api.cloudflare.com/client/v4/accounts/"
+              + os.environ["CF_ACCOUNT_ID"]
+              + "/pages/projects/"
+              + os.environ["CF_PROJECT_NAME"]
+          )
+          headers = {
+              "Authorization": "Bearer " + token,
+              "Accept": "application/json",
+          }
+
+          def api(method, path, query=None):
+              url = base + path
+              if query:
+                  url += "?" + urlencode(query)
+              request = Request(url, headers=headers, method=method)
+              for attempt in range(4):
+                  try:
+                      with urlopen(request, timeout=35) as response:
+                          body = json.load(response)
+                      if not body.get("success", False):
+                          raise RuntimeError(f"Cloudflare rejeitou {method} {path}: {body.get('errors')}")
+                      return body
+                  except HTTPError as error:
+                      detail = error.read(1024).decode("utf-8", errors="replace")
+                      if error.code in (429, 500, 502, 503, 504) and attempt < 3:
+                          time.sleep(2 ** (attempt + 1))
+                          continue
+                      raise RuntimeError(f"Cloudflare HTTP {error.code} em {method} {path}: {detail}") from error
+                  except URLError as error:
+                      if attempt < 3:
+                          time.sleep(2 ** (attempt + 1))
+                          continue
+                      raise RuntimeError(f"Falha de rede em {method} {path}: {error}") from error
+
+          def active():
+              project = api("GET", "")["result"]
+              deployment = project.get("canonical_deployment")
+              if not deployment:
+                  raise RuntimeError("Nao foi possivel identificar a implantacao ativa.")
+              if deployment.get("environment") != "production" or deployment.get("latest_stage", {}).get("status") != "success":
+                  raise RuntimeError("Implantacao ativa nao esta confirmada como producao bem-sucedida.")
+              return deployment
+
+          current = active()
+          if os.environ.get("GITHUB_EVENT_NAME") == "push":
+              expected = os.environ["GITHUB_COMMIT_SHA"]
+              for attempt in range(40):
+                  found = current.get("deployment_trigger", {}).get("metadata", {}).get("commit_hash")
+                  if found == expected:
+                      break
+                  if attempt == 39:
+                      sys.exit("A producao ainda nao corresponde ao commit deste push; limpeza cancelada com seguranca.")
+                  time.sleep(15)
+                  current = active()
+
+          keep_id = current["id"]
+          keep_created = current["created_on"]
+          print(f"Producao preservada: {keep_id} ({keep_created})")
+
+          deployments = []
+          page = 1
+          while True:
+              result = api("GET", "/deployments", {"page": page, "per_page": 25})
+              deployments.extend(result.get("result", []))
+              if page >= result.get("result_info", {}).get("total_pages", page):
+                  break
+              page += 1
+
+          removed = 0
+          for deployment in deployments:
+              old_id = deployment["id"]
+              if old_id == keep_id:
+                  continue
+              if deployment.get("created_on", "") > keep_created:
+                  continue
+              if active()["id"] != keep_id:
+                  sys.exit("A producao mudou durante a limpeza. As exclusoes restantes foram canceladas.")
+              try:
+                  api("DELETE", "/deployments/" + old_id, {"force": "true"})
+                  removed += 1
+              except RuntimeError as error:
+                  print(f"Nao foi possivel excluir {old_id}: {error}", file=sys.stderr)
+
+          print(f"Concluido: {removed} deployment(s) antigo(s) removido(s); producao {keep_id} preservada.")
+          PY
