@@ -20,5 +20,13 @@ export function formatText(d){
       c.descricao?`Regra: ${c.descricao}`:'',
       ...c.checks.map(check=>formatCheckText(check.expressao))
     ].filter(Boolean).join(' | '),formatColumnComment(d.schema_alvo,t,c)])
-  ].filter(Boolean).join('\n'))].join('\n')
+  ...(t.sqlRestricoes?.length?['Restrições SQL:',...t.sqlRestricoes]:[]),
+    ...(t.sqlTriggers?.length?['Triggers SQL:',...t.sqlTriggers]:[]),
+    ...(t.sqlIndices?.length?['Índices SQL:',...t.sqlIndices]:[]),
+    ...(t.sqlPoliticas?.length?['Políticas/RLS:',...t.sqlPoliticas]:[])
+  ].filter(Boolean).join('\n')),
+    ...(d.enums?.length?['\nENUMs do schema:',...d.enums.map(e=>e.sql+(e.comentario?'\nComentário: '+e.comentario:''))]:[]),
+    ...(d.funcoesSql?.length?['\nFunções SQL:',...d.funcoesSql]:[]),
+    ...(d.comentariosSql?.length?['\nComentários SQL globais:',...d.comentariosSql]:[])
+  ].join('\n')
 }
