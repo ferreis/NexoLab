@@ -95,3 +95,23 @@ test('TXT e JSON geram COMMENT ON COLUMN separado da regra com escape dos identi
   assert.equal((txt.match(/COMMENT ON COLUMN/g)||[]).length,1)
   assert.equal(exported.tabelas[0].colunas[1].comentario_sql,undefined)
 })
+
+
+test('TXT preserva objetos e restrições SQL importados',()=>{
+  globalThis.localStorage={getItem:()=>null,setItem:()=>{}}
+  setActivePinia(createPinia())
+  const store=useModelStore()
+  store.importSql([
+    "CREATE TYPE rpg.estado AS ENUM ('ativo', 'inativo');",
+    "CREATE TABLE rpg.fichas (id bigint PRIMARY KEY);",
+    "ALTER TABLE rpg.fichas ADD CONSTRAINT fichas_ck CHECK (id > 0);",
+    "CREATE TRIGGER atualizar BEFORE UPDATE ON rpg.fichas FOR EACH ROW EXECUTE FUNCTION rpg.atualizar();",
+    "CREATE POLICY acesso ON rpg.fichas TO authenticated USING (true);"
+  ].join('\n'),'replace')
+  const txt=formatText(store.exported)
+  assert.match(txt,/ENUMs do schema/)
+  assert.match(txt,/Restrições SQL:/)
+  assert.match(txt,/fichas_ck/)
+  assert.match(txt,/Triggers SQL:/)
+  assert.match(txt,/Políticas\/RLS:/)
+})
