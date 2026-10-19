@@ -9,12 +9,13 @@ import HelpTooltip from './components/HelpTooltip.vue'
 import CheckEditor from './components/CheckEditor.vue'
 import EnumValuesInput from './components/EnumValuesInput.vue'
 import SqlImportDialog from './components/SqlImportDialog.vue'
+import BulkEditDialog from './components/BulkEditDialog.vue'
 import { formatText } from './textExport.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
-const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null)
+const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const previewScope=ref('all'), formatOpen=ref(false)
 const scopeAll=ref(null), scopeTable=ref(null)
@@ -78,7 +79,15 @@ function collapseDefaults(){
   collapsed.value=next
 }
 collapseDefaults()
-function addDefaults(){store.addDefaults();collapseDefaults()}
+function addDefaults(){const result=store.addDefaults('selected');collapseDefaults();toast(`Padrões aplicados: ${result.created} criadas, ${result.updated} atualizadas.`)}
+async function addDefaultsAll(){
+  if(!store.doc.tabelas.length)return
+  if(!await askConfirmation({title:'Aplicar padrões em todas as tabelas?',message:'Isso cria ou atualiza id, criado_em e atualizado_em em todas as tabelas. Tipos, valores padrão, imutabilidade e regras dessas três colunas serão padronizados. Se outra coluna já for PK, a coluna id dessa tabela será mantida.',action:'Aplicar padrões'}))return
+  const result=store.addDefaults('all')
+  collapseDefaults()
+  toast(`Padrões em ${result.tables} tabelas: ${result.created} criadas, ${result.updated} atualizadas, ${result.skipped} ignoradas.`)
+}
+function bulkApplied(result){collapseDefaults();toast(`${result.changed} coluna(s) alterada(s).`)}
 const confirmation=ref(null), confirmationDialog=ref(null)
 async function askConfirmation(options){
   if(confirmation.value)return false
@@ -132,6 +141,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
     <div class="top-actions">
       <button class="btn ghost" @click="fileInput?.click()"><Upload :size="15"/> Importar JSON</button>
       <button class="btn ghost" @click="sqlDialog?.open()"><Upload :size="15"/> Importar SQL</button>
+      <button class="btn ghost" :disabled="!store.doc.tabelas.length" @click="bulkDialog?.open()"><Copy :size="15"/> Edição em massa</button>
       <button class="btn" :disabled="!!store.nameError" @click="download('modelo-banco.json',json,'application/json')"><FileJson :size="15"/> JSON</button>
       <button class="btn primary" :disabled="!!store.nameError" @click="download('modelo-banco.txt',txt,'text/plain')"><Download :size="15"/> TXT</button>
       <input ref="fileInput" type="file" accept=".json,application/json" hidden @change="importJson"/>
@@ -155,7 +165,10 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
             <Database :size="15"/><span>{{t.nome||'Sem nome'}}</span><small>{{t.colunas.length}}</small>
           </button>
         </nav>
-        <button class="btn primary full" @click="store.addTable()"><Plus :size="16"/> Nova tabela</button>
+        <div class="table-side-actions">
+          <button class="btn primary full" @click="store.addTable()"><Plus :size="16"/> Nova tabela</button>
+          <button class="btn full" :disabled="!store.doc.tabelas.length" @click="addDefaultsAll"><Plus :size="16"/> Padrões em todas as tabelas</button>
+        </div>
       </template>
     </aside>
     <main class="editor panel">
@@ -246,6 +259,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
     </aside>
   </div>
   <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
+  <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>
   <dialog ref="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-description" @cancel.prevent="closeConfirmation(false)">
     <template v-if="confirmation">
       <div class="confirmation-icon"><Info :size="22"/></div>
