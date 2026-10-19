@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useModelStore, TYPES, isDefaultColumn } from './stores/modelador'
 import TableCombobox from './components/TableCombobox.vue'
 import NameInput from './components/NameInput.vue'
@@ -26,7 +26,7 @@ const sidebarCategory=ref('tables')
 const sidebarCategories=computed(()=>schemaCategories(store.doc))
 const sidebarEntries=computed(()=>schemaEntries(store.doc,sidebarCategory.value))
 function selectSidebarEntry(entry){
-  if(sidebarCategory.value==='tables'){store.selectedId=entry.tableId;return}
+  if(sidebarCategory.value==='tables'){store.selectedId=entry.tableId;collapseSelectedTable();return}
   if(sidebarCategory.value==='functions'){functionDialog.value?.open(entry.label);return}
   objectDialog.value?.open(sidebarCategory.value,entry)
 }
@@ -80,6 +80,12 @@ async function moveWithKeyboard(event,column){
   }
 }
 const collapsed=ref(new Set())
+function collapseSelectedTable(){
+  collapsed.value=new Set((store.selected?.colunas||[]).map(column=>column.uid))
+}
+// Ao abrir uma tabela, inclusive a primeira carregada ou uma tabela importada,
+// todas as colunas começam recolhidas. Alterar outras propriedades não reinicia a expansão.
+watch(()=>store.selected,collapseSelectedTable,{immediate:true})
 const allColumnsCollapsed=computed(()=>store.columns.length>0&&store.columns.every(c=>collapsed.value.has(c.uid)))
 function toggleAllColumns(){
   const expand=allColumnsCollapsed.value
@@ -95,7 +101,6 @@ function collapseDefaults(){
   for(const table of store.doc.tabelas)for(const column of table.colunas)if(isDefaultColumn(column))next.add(column.uid)
   collapsed.value=next
 }
-collapseDefaults()
 function addDefaults(){const result=store.addDefaults('selected');collapseDefaults();toast(`Padrões aplicados: ${result.created} criadas, ${result.updated} atualizadas.`)}
 async function addDefaultsAll(){
   if(!store.doc.tabelas.length)return
