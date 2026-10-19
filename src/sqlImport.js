@@ -85,8 +85,8 @@ function column(name,raw,enums,warnings,schema){
   const index=keyword(raw,stop)
   const type=(index<0?raw:raw.slice(0,index)).trim()
   const opts=index<0?'':raw.slice(index)
-  const numeric=/^(?:numeric|decimal)\s*(?:\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\))?$/i.exec(type)
-  const varchar=/^(character varying|varchar|character|char)\s*(?:\(\s*(\d+)\s*\))?$/i.exec(type)
+  const numeric=/^(?:"?numeric"?|"?decimal"?)\s*(?:\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\))?$/i.exec(type)
+  const varchar=/^("?character varying"?|"?varchar"?|"?character"?|"?char"?)\s*(?:\(\s*(\d+)\s*\))?$/i.exec(type)
   const known={
     bigint:'BIGINT',int8:'BIGINT',bigserial:'BIGINT',integer:'INTEGER',int:'INTEGER',int4:'INTEGER',serial:'INTEGER',
     smallint:'SMALLINT',int2:'SMALLINT',smallserial:'SMALLINT',boolean:'BOOLEAN',bool:'BOOLEAN',text:'TEXT',
@@ -94,7 +94,7 @@ function column(name,raw,enums,warnings,schema){
     'timestamp without time zone':'TIMESTAMP','timestamp with time zone':'TIMESTAMPTZ',
     timestamptz:'TIMESTAMPTZ',uuid:'UUID',jsonb:'JSONB','text[]':'TEXT[]'
   }
-  let tipo=known[type.toLowerCase()]||'CUSTOM',tamanho='',escala='',enumNome='',enumValores=[]
+  let tipo=known[unquote(type).toLowerCase()]||'CUSTOM',tamanho='',escala='',enumNome='',enumValores=[]
   if(numeric){tipo='NUMERIC';tamanho=numeric[1]||'';escala=numeric[2]||''}
   else if(varchar){tipo=/^(char|character)$/i.test(varchar[1])?'CHAR':'VARCHAR';tamanho=varchar[2]||''}
   else if(tipo==='CUSTOM'){
@@ -141,7 +141,7 @@ function createTable(sql,schema,enums,warnings){
   const m=re('^CREATE\\s+(?:UNLOGGED\\s+)?TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?('+NAME+')\\s*\\(').exec(sql)
   if(!m)throw new Error('CREATE TABLE inválido ou não suportado.')
   const r=qualified(m[1],schema)
-  const t={nome:r.nome,schema:r.schema,comentario:'',colunas:[],uniqueCompostos:[],sqlRestricoes:[],sqlTriggers:[],sqlIndices:[]}
+  const t={nome:r.nome,schema:r.schema,comentario:'',colunas:[],uniqueCompostos:[],sqlRestricoes:[],sqlTriggers:[],sqlIndices:[],sqlPoliticas:[]}
   const defs=splitTop(parenthesized(sql,m[0].length-1))
   for(const part of defs){
     if(/^(?:CONSTRAINT\s+\S+\s+)?(?:PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|CHECK|EXCLUDE)\b/i.test(part)){t.sqlRestricoes.push(part);continue}
@@ -160,7 +160,7 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
     if(m){const r=qualified(m[1],defaultSchema);enums.push({...r,valores:splitTop(parenthesized(st,m[0].length-1)).map(literal),sql:st});continue}
     if(/^CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b/i.test(st)){functions.push(st);continue}
     if(/^CREATE\s+(?:UNLOGGED\s+)?TABLE\b/i.test(st)){create.push(st);continue}
-    if(/^(?:ALTER\s+TABLE|COMMENT\s+ON|CREATE\s+(?:UNIQUE\s+)?INDEX|CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER)\b/i.test(st)){other.push(st);continue}
+    if(/^(?:ALTER\s+TABLE|COMMENT\s+ON|CREATE\s+(?:UNIQUE\s+)?INDEX|CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER|CREATE\s+POLICY)\b/i.test(st)){other.push(st);continue}
     if(/^CREATE\s+|^ALTER\s+|^COMMENT\s+/i.test(st)&&!/^ALTER\s+(?:TYPE|FUNCTION|SCHEMA|DEFAULT\s+PRIVILEGES)\b|^CREATE\s+(?:SCHEMA|EXTENSION|SEQUENCE)\b|^COMMENT\s+ON\s+(?:SCHEMA|TYPE|FUNCTION)\b/i.test(st))ignored++
   }
   const tables=create.map(st=>createTable(st,defaultSchema,enums,warnings))
@@ -170,6 +170,10 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
   const schema=tables[0].schema
   const find=r=>tables.find(t=>norm(t.schema)===norm(r.schema)&&norm(t.nome)===norm(r.nome))
   for(const st of other){
+    let policy=re('^CREATE\\s+POLICY\\s+[\\s\\S]+?\\bON\\s+('+NAME+')\\b').exec(st)
+    if(policy){const t=find(qualified(policy[1],schema));if(t)t.sqlPoliticas.push(st);continue}
+    policy=re('^ALTER\\s+TABLE\\s+('+NAME+')\\s+(?:ENABLE|DISABLE|FORCE|NO\\s+FORCE)\\s+ROW\\s+LEVEL\\s+SECURITY').exec(st)
+    if(policy){const t=find(qualified(policy[1],schema));if(t)t.sqlPoliticas.push(st);continue}
     let m=re('^ALTER\\s+TABLE\\s+(?:ONLY\\s+)?('+NAME+')\\s+ADD\\s+(CONSTRAINT\\s+[\\s\\S]+)$').exec(st)
     if(m){const t=find(qualified(m[1],schema));if(t)constraint(t,m[2],schema);continue}
     m=re('^ALTER\\s+TABLE\\s+(?:ONLY\\s+)?('+NAME+')\\s+ALTER\\s+COLUMN\\s+('+ID+')\\s+ADD\\s+(GENERATED\\s+(?:ALWAYS|BY\\s+DEFAULT)\\s+AS\\s+IDENTITY)').exec(st)
@@ -195,5 +199,5 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
     avisos:arrayUnique(warnings),
     resumo:{tabelas:tables.length,colunas:tables.reduce((n,t)=>n+t.colunas.length,0),
       enums:enums.filter(e=>norm(e.schema)===norm(schema)).length,funcoes:functions.length,
-      triggers:tables.reduce((n,t)=>n+t.sqlTriggers.length,0),restricoes:tables.reduce((n,t)=>n+t.sqlRestricoes.length,0)}}
+      triggers:tables.reduce((n,t)=>n+t.sqlTriggers.length,0),politicas:tables.reduce((n,t)=>n+t.sqlPoliticas.length,0),restricoes:tables.reduce((n,t)=>n+t.sqlRestricoes.length,0)}}
 }
