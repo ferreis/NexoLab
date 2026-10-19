@@ -84,6 +84,14 @@ No modo **SQL**, cole uma expressão ou `CHECK (...)` e clique em **Converter pa
 
 O TXT documenta UNIQUE individual e UNIQUE Compose apenas na linha da coluna de origem, e os CHECKs na mesma linha da coluna em que foram cadastrados, separados por `|`. Não há linha vazia entre o título da tabela e suas colunas; tabelas consecutivas são separadas por uma linha vazia. O TXT compacta os CHECKs e remove parênteses externos redundantes; o JSON preserva as expressões originais e os dados estruturados para edição e importação. Prévia, cópia e download usam essa mesma formatação, com cláusulas `CHECK (expressão)` do formatador PostgreSQL compartilhado. A primeira coluna de cada composição identifica a origem do cadastro no JSON e no armazenamento local; a ordem é preservada ao importar e reordenar colunas. As demais colunas participam da restrição, sem repetir o cadastro ou a indicação na interface e no TXT. Uma tabela pode ter várias composições, inclusive criadas na mesma coluna. O modelo atual oferece TXT/JSON, sem exportador SQL completo nem execução ou validação de sintaxe contra um banco. Desmarcar CHECK remove as restrições cadastradas naquela coluna. Modelos antigos sem o campo `checks` continuam sendo importados.
 
+## Funções SQL e referências nas regras
+
+O botão **Funções SQL** abre o catálogo de definições importadas ou criadas. É possível buscar, criar um modelo `CREATE OR REPLACE FUNCTION`, editar o SQL completo e excluir uma função. O sistema guarda as definições no JSON do projeto e não executa SQL no banco. Ao renomear uma função pelo editor, o modelador atualiza as referências textuais `#nome` no schema, nas tabelas e nas colunas. Uma função citada em regras não pode ser excluída enquanto suas referências existirem.
+
+Os campos **Regras do schema**, **Regras da tabela** e **Regra** de cada coluna aceitam texto livre. Digitar `#` abre sugestões de funções, filtradas conforme o nome digitado. É possível combinar texto com referências, por exemplo: `O registro é validado por #validar_atualizacao antes da atualização.` Os nomes citados aparecem como atalhos clicáveis para abrir a função correspondente.
+
+Na prévia **Tabela**, TXT e JSON mostram apenas informações próprias da tabela, colunas, chaves, relacionamentos FK, UNIQUEs e CHECKs. O TXT é um resumo legível e não repete comandos de comentário, triggers, índices, políticas nem objetos globais. Na prévia **Esquema** e no download integral, as instruções SQL importadas e as definições globais são preservadas.
+
 ## Validar
 
 ```bash
