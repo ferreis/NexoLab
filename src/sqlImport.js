@@ -109,8 +109,10 @@ function column(name,raw,enums,warnings,schema){
   const generated=/\b(GENERATED\s+(?:ALWAYS|BY\s+DEFAULT)\s+AS\s+IDENTITY)\b/i.exec(opts)
   if(generated)padrao=generated[1].replace(/\s+/g,' ').toUpperCase()
   const checks=[]
-  const ck=/\bCHECK\s*\(/i.exec(opts)
-  if(ck)checks.push({expressao:parenthesized(opts,ck.index+ck[0].lastIndexOf('(')).trim()})
+  for(const ck of opts.matchAll(/\bCHECK\s*\(/gi)){
+    const expressao=parenthesized(opts,ck.index+ck[0].lastIndexOf('(')).trim()
+    if(!checks.some(item=>item.expressao===expressao))checks.push({expressao})
+  }
   const foreign=re('\\bREFERENCES\\s+('+NAME+')\\s*\\(\\s*('+ID+')\\s*\\)').exec(opts)
   return {nome:name,tipo,tamanho,escala,sqlTipoOriginal:type,enumNome,enumValores,
     nullable:!/\bNOT\s+NULL\b|\bPRIMARY\s+KEY\b/i.test(opts),pk:/\bPRIMARY\s+KEY\b/i.test(opts),
