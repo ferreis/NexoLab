@@ -11,15 +11,29 @@ import EnumValuesInput from './components/EnumValuesInput.vue'
 import SqlImportDialog from './components/SqlImportDialog.vue'
 import BulkEditDialog from './components/BulkEditDialog.vue'
 import SqlFunctionManager from './components/SqlFunctionManager.vue'
+import SchemaObjectDialog from './components/SchemaObjectDialog.vue'
+import { schemaCategories, schemaEntries } from './schemaNavigation.js'
 import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
 import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
-import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2 } from 'lucide-vue-next'
+import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, ListFilter } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
-const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null)
+const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
+const sidebarCategory=ref('tables')
+const sidebarCategories=computed(()=>schemaCategories(store.doc))
+const sidebarEntries=computed(()=>schemaEntries(store.doc,sidebarCategory.value))
+function selectSidebarEntry(entry){
+  if(sidebarCategory.value==='tables'){store.selectedId=entry.tableId;return}
+  if(sidebarCategory.value==='functions'){functionDialog.value?.open(entry.label);return}
+  objectDialog.value?.open(sidebarCategory.value,entry)
+}
+function addSidebarItem(){
+  if(sidebarCategory.value==='tables')store.addTable()
+  else if(sidebarCategory.value==='functions')functionDialog.value?.create()
+}
 const previewScope=ref('all'), formatOpen=ref(false)
 const scopeAll=ref(null), scopeTable=ref(null)
 function selectScope(scope){
@@ -155,24 +169,42 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
     <aside class="sidebar panel" :class="{collapsed:!leftOpen}">
       <button v-if="!leftOpen" class="dock-toggle" :title="leftOpen?'Recolher tabelas':'Expandir tabelas'" @click="leftOpen=!leftOpen"><PanelLeftClose v-if="leftOpen" :size="18"/><PanelLeftOpen v-else :size="18"/></button>
       <template v-if="leftOpen">
-        <div class="sidehead"><h2>Tabelas <span class="subtle">({{store.doc.tabelas.length}})</span></h2><div class="panel-actions"><button class="iconbtn" title="Criar tabela" @click="store.addTable()"><Plus :size="18"/></button><button class="iconbtn" title="Recolher tabelas" aria-label="Recolher tabelas" @click="leftOpen=false"><PanelLeftClose :size="18"/></button></div></div>
-        <label>Projeto<input v-model="store.doc.projeto" placeholder="Nome do projeto"/></label>
+        <div class="sidehead">
+          <div class="sidebar-category">
+            <select v-model="sidebarCategory" aria-label="Selecionar categoria de objetos do schema" title="Escolher Tabelas, ENUMs, Triggers ou Functions">
+              <option v-for="category in sidebarCategories" :key="category.value" :value="category.value">{{category.label}} ({{category.count}})</option>
+            </select>
+            <ChevronDown :size="14" aria-hidden="true"/>
+          </div>
+          <div class="panel-actions">
+            <button v-if="sidebarCategory==='tables'||sidebarCategory==='functions'" class="iconbtn" :title="sidebarCategory==='tables'?'Criar tabela':'Criar função SQL'" :aria-label="sidebarCategory==='tables'?'Criar tabela':'Criar função SQL'" @click="addSidebarItem"><Plus :size="18"/></button>
+            <button class="iconbtn" title="Recolher barra lateral" aria-label="Recolher barra lateral" @click="leftOpen=false"><PanelLeftClose :size="18"/></button>
+          </div>
+        </div>
         <label>Schema<input v-model="store.doc.schema" placeholder="rpg"/></label>
         <label>Regras do schema<FunctionMentionTextarea v-model="store.doc.regrasSchema" :functions="store.doc.funcoesSql" :rows="3" @open-function="name=>functionDialog?.open(name)"/></label>
-        <details v-if="store.doc.enums?.length||store.doc.funcoesSql?.length||store.doc.comentariosSql?.length" class="sql-schema-info">
-          <summary>Objetos SQL ({{store.doc.enums?.length||0}} enums, {{store.doc.funcoesSql?.length||0}} funções, {{store.doc.comentariosSql?.length||0}} comentários)</summary>
-          <details v-for="item in store.doc.enums" :key="item.schema+'.'+item.nome"><summary>ENUM {{item.nome}}</summary><pre>{{item.valores.join(', ')}}</pre></details>
-          <details v-for="(sql,i) in store.doc.funcoesSql" :key="i"><summary>Função {{i+1}}</summary><pre>{{sql}}</pre></details>
+        <details v-if="store.doc.comentariosSql?.length" class="sql-schema-info">
+          <summary>Comentários SQL ({{store.doc.comentariosSql.length}})</summary>
           <details v-for="(sql,i) in store.doc.comentariosSql" :key="'comment'+i"><summary>Comentário SQL {{i+1}}</summary><pre>{{sql}}</pre></details>
         </details>
-        <nav class="tablelist">
-          <button v-for="t in store.sortedTables" :key="t.uid" class="tablebtn" :title="t.nome||'Sem nome'" :class="{active:store.selectedId===t.uid}" @click="store.selectedId=t.uid">
-            <Database :size="15"/><span>{{t.nome||'Sem nome'}}</span><small>{{t.colunas.length}}</small>
+        <nav :key="sidebarCategory" class="tablelist" :aria-label="'Lista de '+sidebarCategories.find(c=>c.value===sidebarCategory)?.label">
+          <button v-for="entry in sidebarEntries" :key="entry.key" class="tablebtn" :title="entry.tableName?entry.label+' · '+entry.tableName:entry.label" :class="{active:sidebarCategory==='tables'&&store.selectedId===entry.tableId}" @click="selectSidebarEntry(entry)">
+            <Database v-if="sidebarCategory==='tables'" :size="15"/>
+            <List v-else-if="sidebarCategory==='enums'" :size="15"/>
+            <Workflow v-else-if="sidebarCategory==='triggers'" :size="15"/>
+            <Code2 v-else :size="15"/>
+            <span>{{entry.label}}</span>
+            <small v-if="sidebarCategory==='tables'||sidebarCategory==='enums'">{{entry.count}}</small>
+            <small v-else-if="sidebarCategory==='triggers'" class="sidebar-table-tag">{{entry.tableName}}</small>
           </button>
+          <p v-if="!sidebarEntries.length" class="sidebar-empty">Nenhum item nesta categoria.</p>
         </nav>
-        <div class="table-side-actions">
+        <div v-if="sidebarCategory==='tables'" class="table-side-actions">
           <button class="btn primary full" @click="store.addTable()"><Plus :size="16"/> Nova tabela</button>
           <button class="btn full" :disabled="!store.doc.tabelas.length" @click="addDefaultsAll"><Plus :size="16"/> Padrões em todas as tabelas</button>
+        </div>
+        <div v-else-if="sidebarCategory==='functions'" class="table-side-actions">
+          <button class="btn primary full" @click="functionDialog?.create()"><Plus :size="16"/> Nova função SQL</button>
         </div>
       </template>
     </aside>
@@ -267,6 +299,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
   <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
   <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>
   <SqlFunctionManager ref="functionDialog"/>
+  <SchemaObjectDialog ref="objectDialog"/>
   <dialog ref="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmation-title" aria-describedby="confirmation-description" @cancel.prevent="closeConfirmation(false)">
     <template v-if="confirmation">
       <div class="confirmation-icon"><Info :size="22"/></div>
