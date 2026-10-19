@@ -29,7 +29,7 @@ export const TYPES = [
 const makeId=()=>crypto.randomUUID()
 export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,checkEnabled:false,checks:[],fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:'',comentario:''})
 export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',comentario:'',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
-const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[],enums:[],funcoesSql:[]})
+const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[],enums:[],funcoesSql:[],comentariosSql:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
 export const isDefaultColumn=c=>['id','criado_em','atualizado_em'].includes(columnName(c))
 function orderColumns(columns){
@@ -52,7 +52,7 @@ function convertColumn(c){
 function convert(input){
   if (!input || !Array.isArray(input.tabelas)) throw new Error('Arquivo sem a lista de tabelas')
   return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),
-    enums:Array.isArray(input.enums)?input.enums:[],funcoesSql:Array.isArray(input.funcoesSql)?input.funcoesSql:[],
+    enums:Array.isArray(input.enums)?input.enums:[],funcoesSql:Array.isArray(input.funcoesSql)?input.funcoesSql:[],comentariosSql:Array.isArray(input.comentariosSql)?input.comentariosSql:[],
     tabelas:input.tabelas.map(t=>{
     const colunas=orderColumns((t.colunas||[]).map(convertColumn))
     for(const column of colunas)for(const check of column.checks)if(check.construtor&&compileCheckBuilder(check.construtor,colunas)!==check.expressao)throw new Error('A expressão CHECK não corresponde às condições do construtor.')
@@ -229,6 +229,7 @@ export const useModelStore=defineStore('modelador',()=>{
     if(!current.tabelas.length)current.schema=parsed.schema_alvo
     current.enums??=[]
     current.funcoesSql??=[]
+    current.comentariosSql??=[]
     const identifier=s=>String(s).trim().toLowerCase()
     const appendUnique=(target,source)=>{for(const item of source||[])if(!target.some(x=>JSON.stringify(x)===JSON.stringify(item)))target.push(item)}
     for(const incoming of parsed.tabelas){
@@ -260,6 +261,7 @@ export const useModelStore=defineStore('modelador',()=>{
       else current.enums.push(incoming)
     }
     appendUnique(current.funcoesSql,parsed.funcoesSql)
+    appendUnique(current.comentariosSql,parsed.comentariosSql)
     const imported=convert(current)
     const error=duplicateNameError(imported.tabelas)
     if(error)throw new Error(error)
@@ -272,6 +274,7 @@ export const useModelStore=defineStore('modelador',()=>{
     formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
     ...(doc.value.enums?.length?{enums:doc.value.enums}:{}),
     ...(doc.value.funcoesSql?.length?{funcoesSql:doc.value.funcoesSql}:{}),
+    ...(doc.value.comentariosSql?.length?{comentariosSql:doc.value.comentariosSql}:{}),
     tabelas:sortedTables.value.map(t=>({nome:t.nome,comentario:t.comentario,
       ...(t.sqlRestricoes?.length?{sqlRestricoes:t.sqlRestricoes}:{}),
       ...(t.sqlTriggers?.length?{sqlTriggers:t.sqlTriggers}:{}),
