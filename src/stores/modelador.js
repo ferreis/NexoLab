@@ -6,6 +6,7 @@ import { checkExpression, convertChecks } from '../checkConstraints.js'
 import { compileCheckBuilder, cloneBuilder, builderUsesColumn, visitCheckConditions } from '../checkBuilder.js'
 import { formatTableComment, formatColumnComment } from '../tableComments.js'
 import { parsePostgresDDL } from '../sqlImport.js'
+import { validateFunctionSql, parseFunction, replaceFunctionReference, referencesInText } from '../sqlFunctions.js'
 import { renameColumnsInDocument, renameTableInDocument, bulkReplaceName, updateImportedCheck } from '../modelRefactor.js'
 
 export const TYPES = [
@@ -30,7 +31,7 @@ export const TYPES = [
 const makeId=()=>crypto.randomUUID()
 export const makeColumn=(name='',type='VARCHAR')=>({uid:makeId(),nome:name,tipo:type,tamanho:'',escala:'',nullable:false,pk:false,unique:false,uniqueComposto:false,checkEnabled:false,checks:[],fk:false,fkTabela:'',fkColuna:'id',padrao:'',imutavel:false,enumValores:[],descricao:'',comentario:''})
 export const makeTable=()=>({uid:makeId(),nome:'nova_tabela',comentario:'',finalidade:'',regras:'',colunas:[],uniqueCompostos:[]})
-const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',tabelas:[],enums:[],funcoesSql:[],comentariosSql:[]})
+const base=()=>({version:2,projeto:'NexoDB Lab',schema:'rpg',regrasSchema:'',tabelas:[],enums:[],funcoesSql:[],comentariosSql:[]})
 const columnName=c=>c.nome.trim().toLowerCase()
 export const isDefaultColumn=c=>['id','criado_em','atualizado_em'].includes(columnName(c))
 function orderColumns(columns){
@@ -52,7 +53,7 @@ function convertColumn(c){
 }
 function convert(input){
   if (!input || !Array.isArray(input.tabelas)) throw new Error('Arquivo sem a lista de tabelas')
-  return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),
+  return {version:2,projeto:String(input.projeto||'NexoDB Lab'),schema:String(input.schema_alvo||input.schema||'rpg'),regrasSchema:String(input.regrasSchema??''),
     enums:Array.isArray(input.enums)?input.enums:[],funcoesSql:Array.isArray(input.funcoesSql)?input.funcoesSql:[],comentariosSql:Array.isArray(input.comentariosSql)?input.comentariosSql:[],
     tabelas:input.tabelas.map(t=>{
     const colunas=orderColumns((t.colunas||[]).map(convertColumn))
@@ -348,12 +349,41 @@ export const useModelStore=defineStore('modelador',()=>{
     selectedId.value=doc.value.tabelas.find(t=>identifier(t.nome)===identifier(previousSelected))?.uid||doc.value.tabelas[0]?.uid||null
     return {...parsed.resumo,addedTables,addedColumns,skippedColumns,avisos:parsed.avisos}
   }
+  function saveFunctionSql(sql,index=null){
+    const parsed=validateFunctionSql(sql)
+    const current=doc.value.funcoesSql||[]
+    if(index!==null&&(!Number.isInteger(index)||index<0||index>=current.length))throw new Error('Função não encontrada.')
+    const previous=index===null?null:parseFunction(current[index])
+    const same=current.some((existing,i)=>i!==index&&existing.trim()===String(sql).trim())
+    if(same)throw new Error('Esta definição SQL já existe.')
+    if(index===null)doc.value.funcoesSql.push(String(sql).trim())
+    else doc.value.funcoesSql[index]=String(sql).trim()
+    if(previous&&previous.name!==parsed.name&&!current.some((item,i)=>i!==index&&parseFunction(item)?.name===previous.name)){
+      doc.value.regrasSchema=replaceFunctionReference(doc.value.regrasSchema,previous.name,parsed.name)
+      for(const t of doc.value.tabelas){
+        t.regras=replaceFunctionReference(t.regras,previous.name,parsed.name)
+        for(const c of t.colunas)c.descricao=replaceFunctionReference(c.descricao,previous.name,parsed.name)
+      }
+    }
+    return parsed
+  }
+  function removeFunctionSql(index){
+    const functions=doc.value.funcoesSql||[]
+    if(!Number.isInteger(index)||index<0||index>=functions.length)throw new Error('Função não encontrada.')
+    const name=parseFunction(functions[index])?.name
+    const others=functions.filter((_,i)=>i!==index)
+    if(name&&!others.some(sql=>parseFunction(sql)?.name===name)){
+      const texts=[doc.value.regrasSchema,...doc.value.tabelas.flatMap(t=>[t.regras,...t.colunas.map(c=>c.descricao)])]
+      if(texts.some(t=>referencesInText(t,functions).some(ref=>ref.toLowerCase()===name.toLowerCase())))throw new Error('Esta função está referenciada em regras. Remova as referências #'+name+' antes de excluí-la.')
+    }
+    doc.value.funcoesSql.splice(index,1)
+  }
   const exported=computed(()=>({
-    formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,
+    formato:'proposta_de_modelagem_banco_rpg',versao:2,projeto:doc.value.projeto,schema_alvo:doc.value.schema,regrasSchema:doc.value.regrasSchema,
     ...(doc.value.enums?.length?{enums:doc.value.enums}:{}),
     ...(doc.value.funcoesSql?.length?{funcoesSql:doc.value.funcoesSql}:{}),
     ...(doc.value.comentariosSql?.length?{comentariosSql:doc.value.comentariosSql}:{}),
-    tabelas:sortedTables.value.map(t=>({nome:t.nome,comentario:t.comentario,
+    tabelas:sortedTables.value.map(t=>({nome:t.nome,comentario:t.comentario,regras:t.regras,finalidade:t.finalidade,
       ...(t.sqlRestricoes?.length?{sqlRestricoes:t.sqlRestricoes}:{}),
       ...(t.sqlTriggers?.length?{sqlTriggers:t.sqlTriggers}:{}),
       ...(t.sqlIndices?.length?{sqlIndices:t.sqlIndices}:{}),
@@ -364,5 +394,5 @@ export const useModelStore=defineStore('modelador',()=>{
         ...(formatColumnComment(doc.value.schema,t,c)?{comentario_sql:formatColumnComment(doc.value.schema,t,c)}:{}),
         checks:checks.map(({uid,...check})=>check),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,bulkRenameColumns,bulkSetColumns,moveColumn,removeColumn,importData,importSql,exported,addCompositeUnique,removeCompositeUnique}
+  return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,addDefaults,bulkRenameColumns,bulkSetColumns,moveColumn,removeColumn,importData,importSql,exported,addCompositeUnique,removeCompositeUnique,saveFunctionSql,removeFunctionSql}
 })
