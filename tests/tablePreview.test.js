@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { tablePreview } from '../src/tablePreview.js'
-import { formatText } from '../src/textExport.js'
+import { formatText, formatTablePreviewText } from '../src/textExport.js'
 
 const model={
   formato:'proposta_de_modelagem_banco_rpg',
@@ -21,16 +21,16 @@ const model={
 
 test('prévia da tabela mostra somente a tabela selecionada e suas regras',()=>{
   const preview=tablePreview(model,0)
-  const text=formatText(preview)
+  const text=formatTablePreviewText(preview)
   assert.deepEqual(preview.tabelas.map(t=>t.nome),['arcos'])
-  assert.match(text,/TABELA: arcos/)
+  assert.match(text,/TABELA: rpg.arcos/)
   assert.match(text,/Restrições SQL:/)
-  assert.match(text,/Triggers SQL:/)
+  assert.doesNotMatch(text,/Triggers SQL:/)
   assert.doesNotMatch(text,/TABELA: fichas/)
   assert.doesNotMatch(text,/ENUMs do schema:|Funções SQL:|Comentários SQL globais:/)
-  assert.doesNotMatch(text,/segredos_tipo|fn_contexto_cena|Contexto geral/)
+  assert.doesNotMatch(text,/segredos_tipo|fn_contexto_cena|Contexto geral|CREATE TRIGGER|COMMENT ON TABLE/)
   const json=JSON.stringify(preview)
-  assert.doesNotMatch(json,/segredos_tipo|fn_contexto_cena|Contexto geral/)
+  assert.doesNotMatch(json,/segredos_tipo|fn_contexto_cena|Contexto geral|CREATE TRIGGER|sqlTriggers|sqlPoliticas|comentario_sql/)
   assert.ok(!Object.hasOwn(preview,'enums'))
   assert.ok(!Object.hasOwn(preview,'funcoesSql'))
   assert.ok(!Object.hasOwn(preview,'comentariosSql'))
@@ -50,4 +50,28 @@ test('não altera o modelo original e apresenta lista vazia para índice inváli
   assert.deepEqual(tablePreview(model,-1).tabelas,[])
   assert.deepEqual(tablePreview(model,99).tabelas,[])
   assert.equal(JSON.stringify(model),before)
+})
+
+test('prévia não repete CHECK SQL já associado a uma coluna',()=>{
+  const checkSql='CONSTRAINT arcos_limite CHECK (id > 0)'
+  const project=structuredClone(model)
+  project.tabelas[0].sqlRestricoes.push(checkSql)
+  project.tabelas[0].colunas[0].checks=[{expressao:'id > 0',origemRestricao:checkSql}]
+  const preview=tablePreview(project,0)
+  const text=formatTablePreviewText(preview)
+  assert.equal((text.match(/CHECK: id > 0/g)||[]).length,1)
+  assert.doesNotMatch(text,/Restrições relacionais e CHECKs adicionais:/)
+})
+test('prévia contém regras e relacionamentos mas omite SQL operacional',()=>{
+  const project=structuredClone(model)
+  project.tabelas[0].regras='Validação via #fn_exemplo.'
+  project.tabelas[0].colunas[0].fk=true
+  project.tabelas[0].colunas[0].fkTabela='outra'
+  project.tabelas[0].colunas[0].fkColuna='id'
+  project.tabelas[0].sqlPoliticas=['CREATE POLICY acesso...']
+  const preview=tablePreview(project,0)
+  const text=formatTablePreviewText(preview)
+  assert.match(text,/Validação via #fn_exemplo/)
+  assert.match(text,/FK -> outra.id/)
+  assert.doesNotMatch(text,/CREATE POLICY/)
 })
