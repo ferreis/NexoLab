@@ -14,7 +14,7 @@ export function schemaCategories(document){
   const tables=document?.tabelas||[]
   return [
     {value:'tables',label:'Tabelas',count:tables.length},
-    {value:'enums',label:'ENUMs',count:(document?.enums||[]).length},
+    {value:'enums',label:'Enum',count:(document?.enums||[]).length},
     {value:'triggers',label:'Triggers',count:tables.reduce((n,t)=>n+(t.sqlTriggers?.length||0),0)},
     {value:'functions',label:'Functions',count:(document?.funcoesSql||[]).length}
   ]
