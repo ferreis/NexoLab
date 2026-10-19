@@ -17,6 +17,11 @@ function open(functionName=''){
   else prepare()
   if(!modal.value?.open)modal.value?.showModal()
 }
+function create(){
+  query.value=''
+  prepare()
+  if(!modal.value?.open)modal.value?.showModal()
+}
 function select(index){selectedIndex.value=index;sql.value=functions.value[index]?.source||'';error.value='';notice.value=''}
 function prepare(){selectedIndex.value=null;error.value='';notice.value='';newName.value='nova_funcao';sql.value=''}
 function generate(){
@@ -36,7 +41,7 @@ function remove(){
   try{store.removeFunctionSql(selectedIndex.value);notice.value='Função removida do projeto.';error.value='';const next=functions.value[0];selectedIndex.value=next?next.index:null;sql.value=next?.source||''}
   catch(e){error.value=e.message}
 }
-defineExpose({open})
+defineExpose({open,create})
 </script>
 <template>
   <dialog ref="modal" class="function-manager-dialog" aria-labelledby="function-manager-title">
