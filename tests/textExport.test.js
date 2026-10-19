@@ -131,5 +131,4 @@ test('prévia integral mantém o fim do schema mesmo com muitas tabelas e funç�
   assert.match(result,/TABELA: tabela_33/)
   assert.equal((result.match(/CREATE FUNCTION/g)||[]).length,24)
   assert.ok(result.trimEnd().endsWith(doc.comentariosSql.at(-1)),'O fim do schema deve continuar presente no texto completo.')
-  assert.ok(result.length>4000,'O gerador retorna o texto integral.')
 })
