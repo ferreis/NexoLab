@@ -94,7 +94,7 @@ function column(name,raw,enums,warnings,schema){
     'timestamp without time zone':'TIMESTAMP','timestamp with time zone':'TIMESTAMPTZ',
     timestamptz:'TIMESTAMPTZ',uuid:'UUID',jsonb:'JSONB','text[]':'TEXT[]'
   }
-  let tipo=known[unquote(type).toLowerCase()]||'CUSTOM',tamanho='',escala='',enumNome='',enumValores=[]
+  let tipo=known[type.replace(/"([^"]+)"/g,'$1').toLowerCase()]||'CUSTOM',tamanho='',escala='',enumNome='',enumValores=[]
   if(numeric){tipo='NUMERIC';tamanho=numeric[1]||'';escala=numeric[2]||''}
   else if(varchar){tipo=/^(char|character)$/i.test(varchar[1])?'CHAR':'VARCHAR';tamanho=varchar[2]||''}
   else if(tipo==='CUSTOM'){
@@ -170,7 +170,7 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
   const schema=tables[0].schema
   const find=r=>tables.find(t=>norm(t.schema)===norm(r.schema)&&norm(t.nome)===norm(r.nome))
   for(const st of other){
-    let policy=re('^CREATE\\s+POLICY\\s+[\\s\\S]+?\\bON\\s+('+NAME+')\\b').exec(st)
+    let policy=re('^CREATE\\s+POLICY\\s+[\\s\\S]+?\\bON\\s+('+NAME+')(?=\\s|;|$)').exec(st)
     if(policy){const t=find(qualified(policy[1],schema));if(t)t.sqlPoliticas.push(st);continue}
     policy=re('^ALTER\\s+TABLE\\s+('+NAME+')\\s+(?:ENABLE|DISABLE|FORCE|NO\\s+FORCE)\\s+ROW\\s+LEVEL\\s+SECURITY').exec(st)
     if(policy){const t=find(qualified(policy[1],schema));if(t)t.sqlPoliticas.push(st);continue}
@@ -189,7 +189,7 @@ export function parsePostgresDDL(sql,defaultSchema='rpg'){
       else warnings.push('Há uma trigger sem tabela correspondente no arquivo.')
       continue
     }
-    m=re('^CREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+(?:CONCURRENTLY\\s+)?(?:IF\\s+NOT\\s+EXISTS\\s+)?'+ID+'\\s+ON\\s+(?:ONLY\\s+)?('+NAME+')\\b').exec(st)
+    m=re('^CREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+(?:CONCURRENTLY\\s+)?(?:IF\\s+NOT\\s+EXISTS\\s+)?'+ID+'\\s+ON\\s+(?:ONLY\\s+)?('+NAME+')(?=\\s|;|$)').exec(st)
     if(m){const t=find(qualified(m[1],schema));if(t)t.sqlIndices.push(st)}
   }
   if(ignored)warnings.push(ignored+' instruções adicionais não foram interpretadas.')
