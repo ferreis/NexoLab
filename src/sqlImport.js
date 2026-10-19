@@ -134,6 +134,21 @@ function constraint(t,sql,schema){
     if(uq.length>1&&!t.uniqueCompostos.some(g=>g.colunas.map(norm).join('|')===uq.map(norm).join('|')))t.uniqueCompostos.push({colunas:uq})
     return
   }
+  // Também projeta restrições CHECK da tabela no editor de CHECKs.
+  const checkMatch=/\bCHECK\s*\(/i.exec(body)
+  if(checkMatch){
+    const expr=parenthesized(body,checkMatch.index+checkMatch[0].lastIndexOf('(')).trim()
+    const mentioned=t.colunas.find(col=>{
+      const escaped=col.nome.replace(/\W/g,'\\  const fk=re('^FOREIGN\\s+KEY\\s*\\(\\s*('+ID+')\\s*\\)\\s*REFERENCES\\s+('+NAME+')\\s*\\(\\s*('+ID+')\\s*\\)').exec(body)')
+      return new RegExp('(?:^|[^\\w$])(?:"'+escaped+'"|'+escaped+')(?![\\w$])','i').test(expr)
+    })
+    const owner=mentioned||t.colunas[0]
+    if(owner&&!owner.checks.some(c=>c.expressao===expr)){
+      owner.checks.push({expressao:expr,origemRestricao:sql})
+      owner.checkEnabled=true
+    }
+    return
+  }
   const fk=re('^FOREIGN\\s+KEY\\s*\\(\\s*('+ID+')\\s*\\)\\s*REFERENCES\\s+('+NAME+')\\s*\\(\\s*('+ID+')\\s*\\)').exec(body)
   if(fk){const c=t.colunas.find(c=>norm(c.nome)===norm(unquote(fk[1])));if(c){const ref=qualified(fk[2],schema);c.fk=true;c.fkTabela=ref.schema===schema?ref.nome:ref.schema+'.'+ref.nome;c.fkColuna=unquote(fk[3])}}
 }
