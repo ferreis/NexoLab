@@ -23,7 +23,7 @@ const model={
 test('categorias contam tabelas, enums, triggers por tabela e funções globais',()=>{
   assert.deepEqual(schemaCategories(model),[
     {value:'tables',label:'Tabelas',count:2},
-    {value:'enums',label:'ENUMs',count:2},
+    {value:'enums',label:'Enum',count:2},
     {value:'triggers',label:'Triggers',count:3},
     {value:'functions',label:'Functions',count:2}
   ])
