@@ -3,8 +3,6 @@ name: Limpar historico do Cloudflare Pages
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -38,7 +36,8 @@ jobs:
 
           token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
           if not token:
-              sys.exit("Configure o secret CLOUDFLARE_API_TOKEN no GitHub (token com permissao Cloudflare Pages:Edit).")
+              print("Secret nao configurado. Limpeza periodica feita pela tarefa conectada ao Cloudflare.")
+              sys.exit(0)
 
           base = (
               "https://api.cloudflare.com/client/v4/accounts/"
