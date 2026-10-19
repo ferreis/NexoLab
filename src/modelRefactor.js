@@ -93,7 +93,7 @@ export function renameColumnsInDocument(doc,edits,helpers={}){
     if(new Set(entries.map(x=>x.column.uid)).size!==entries.length)throw new Error('Coluna selecionada mais de uma vez.')
     const names=new Map(entries.map(x=>[x.column.uid,x.name]))
     const all=table.colunas.map(c=>normalizedName(names.get(c.uid)??c.nome))
-    if(all.some((n,i)=>n&&all.indexOf(n)!==i))throw new Error('A alteração criaria nomes de colunas duplicados na tabela '+table.nome+'.')
+    if(all.some((n,i)=>n&&all.indexOf(n)!==i))throw new Error('Já existe uma coluna com esse nome na tabela '+table.nome+'. A alteração foi cancelada.')
   }
   let changed=0
   for(const entries of changesByTable.values()){
