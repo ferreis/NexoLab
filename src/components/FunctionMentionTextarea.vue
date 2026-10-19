@@ -1,10 +1,11 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue'
-import { functionNames } from '../sqlFunctions.js'
+import { functionNames, referencesInText } from '../sqlFunctions.js'
 const props=defineProps({modelValue:{type:String,default:''},functions:{type:Array,default:()=>[]},rows:{type:Number,default:2},placeholder:{type:String,default:'Escreva a regra ou digite # para referenciar uma função.'}})
-const emit=defineEmits(['update:modelValue'])
+const emit=defineEmits(['update:modelValue','open-function'])
 const input=ref(null),query=ref(null),start=ref(-1),active=ref(0)
 const choices=computed(()=>query.value===null?[]:functionNames(props.functions).filter(name=>name.toLowerCase().includes(query.value.toLowerCase())).slice(0,25))
+const referenced=computed(()=>referencesInText(props.modelValue,props.functions))
 function track(value,caret){
   const before=value.slice(0,caret)
   const match=/(?:^|[^\w#])#([A-Za-z_][\w$]*|)$/.exec(before)
@@ -40,6 +41,7 @@ function onKeydown(event){
     <div v-if="query!==null&&choices.length" class="function-mention-options" role="listbox" aria-label="Funções SQL disponíveis">
       <button v-for="(name,i) in choices" :key="name" type="button" role="option" :aria-selected="i===active" :class="{active:i===active}" @mousedown.prevent="choose(name)"><span>#</span>{{name}}</button>
     </div>
+    <div v-if="referenced.length" class="function-mention-references" aria-label="Funções referenciadas"><button v-for="name in referenced" :key="name" type="button" :title="`Abrir função ${name}`" @click="emit('open-function',name)">#{{name}} ↗</button></div>
     <small class="function-mention-hint">Digite # para citar uma função SQL. Texto sem # permanece uma regra comum.</small>
   </div>
 </template>
