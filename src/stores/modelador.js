@@ -117,6 +117,9 @@ export const useModelStore=defineStore('modelador',()=>{
   const isUniqueEnabled=c=>isUnique(c)||isCompositeUnique(c)
   const isCheckEnabled=c=>c.checkEnabled||c.checks.length>0
   function setCheck(column,enabled){
+    if(!enabled)for(const check of column.checks){
+      if(check.origemRestricao)updateImportedCheck(selected.value,check)
+    }
     column.checkEnabled=enabled
     if(!enabled)column.checks=[]
   }
