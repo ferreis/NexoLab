@@ -317,3 +317,7 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
   .function-manager-code textarea { min-height:270px; }
   .function-manager-new { flex-wrap:wrap; }
 }
+
+.function-mention-references { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.function-mention-references button { padding:5px 8px; border:1px solid #6b578e; border-radius:5px; background:#2b2641; color:#d8c9ff; font:11px ui-monospace,monospace; overflow-wrap:anywhere; }
+.function-mention-references button:hover { background:#433668; }
