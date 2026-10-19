@@ -11,6 +11,7 @@ import EnumValuesInput from './components/EnumValuesInput.vue'
 import SqlImportDialog from './components/SqlImportDialog.vue'
 import BulkEditDialog from './components/BulkEditDialog.vue'
 import { formatText } from './textExport.js'
+import { tablePreview } from './tablePreview.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical } from 'lucide-vue-next'
 const store=useModelStore()
 const checkEditors=new Map(), uniqueEditors=new Map()
@@ -112,8 +113,7 @@ const txt=computed(()=>formatText(store.exported))
 const json=computed(()=>JSON.stringify(store.exported,null,2))
 const previewData=computed(()=>{
   if(previewScope.value==='all')return store.exported
-  const index=store.sortedTables.findIndex(t=>t.uid===store.selectedId)
-  return {...store.exported,tabelas:index<0?[]:[store.exported.tabelas[index]]}
+  return tablePreview(store.exported,store.selected?.nome)
 })
 const previewContent=computed(()=>tab.value==='txt'?formatText(previewData.value):JSON.stringify(previewData.value,null,2))
 const previewCopyLabel=computed(()=>previewScope.value==='all'?'Copiar tudo':'Copiar tabela atual')
