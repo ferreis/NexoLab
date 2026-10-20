@@ -113,7 +113,9 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 .rulehelp { display: flex; align-items: flex-start; gap: 9px; }
 .rulehelp svg { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
 .iconbtn { border: 1px solid var(--line); border-radius: 6px; padding: 7px; display: flex; align-items: center; justify-content: center; background: transparent; color: #b9c6da; flex-shrink: 0; }
-.preview { display: flex; flex-direction: column; height: calc(100vh - 76px); position: sticky; top: 0; border-left: 1px solid var(--line); }
+/* A prévia acompanha a rolagem do editor e ocupa a altura VISÍVEL inteira.
+   Antes, o desconto fixo de 76px deixava um vazio na base ao rolar a página. */
+.preview { display:flex; flex-direction:column; position:sticky; top:0; align-self:start; height:100vh; height:100dvh; max-height:100dvh; overflow:hidden; border-left:1px solid var(--line); }
 .preview.collapsed { display: block; }
 .preview .tabs { display: flex; gap: 4px; background: #0e1520; padding: 4px; border: 1px solid var(--line); border-radius: 7px; }
 .preview-toolbar { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -153,7 +155,7 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 @media (max-width: 1199px) {
   .workspace, .workspace.rightclosed { grid-template-columns: 220px minmax(0, 1fr); }
   .workspace.leftclosed, .workspace.leftclosed.rightclosed { grid-template-columns: 48px minmax(0, 1fr); }
-  .preview { grid-column: 1 / -1; position: relative; height: 340px; border-left: 0; border-top: 1px solid var(--line); }
+  .preview { grid-column: 1 / -1; position: relative; top:auto; align-self:stretch; height:340px; max-height:none; border-left:0; border-top:1px solid var(--line); }
   .preview.collapsed { height: 62px; }
   .fields3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -383,7 +385,7 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 
 /* O texto inteiro rola dentro de um contêiner próprio, com fim explícito.
    O rodapé visual não integra o TXT/JSON copiado ou baixado. */
-.code-preview { min-height:0; }
+.code-preview { min-height:0; overflow:hidden; }
 .code-toolbar { flex-shrink:0; }
 .preview-toolbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:6px; }
 .preview-scroll { display:block; flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-gutter:stable; }
