@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# Evita testes duplicados quando a mesma alteração dispara push e PR na Dev.
+concurrency:
+  group: validacao-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Validar código, compilação e navegação com Playwright
@@ -25,6 +30,8 @@ jobs:
           cache: npm
       - name: Instalar dependências do projeto
         run: npm ci
+      - name: Verificar vulnerabilidades altas e críticas nas dependências de produção
+        run: npm audit --omit=dev --audit-level=high
       - name: Executar testes unitários
         run: npm test
       - name: Compilar aplicação para produção
