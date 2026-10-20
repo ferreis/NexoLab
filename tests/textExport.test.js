@@ -115,3 +115,20 @@ test('TXT preserva objetos e restrições SQL importados',()=>{
   assert.match(txt,/Triggers SQL:/)
   assert.match(txt,/Políticas\/RLS:/)
 })
+
+
+test('prévia integral mantém o fim do schema mesmo com muitas tabelas e funções',()=>{
+  const tables=Array.from({length:34},(_,i)=>({
+    nome:'tabela_'+String(i).padStart(2,'0'),comentario:'',
+    uniqueCompostos:[],colunas:[{nome:'id',tipo:'BIGINT',pk:true,unique:true,nullable:false,checks:[]}],
+    sqlRestricoes:[],sqlTriggers:[],sqlIndices:[],sqlPoliticas:[]
+  }))
+  const functions=Array.from({length:24},(_,i)=>`CREATE FUNCTION rpg.fn_${i}() RETURNS void LANGUAGE sql AS $$ SELECT NULL $$;`)
+  const doc={projeto:'RPG',schema_alvo:'rpg',tabelas:tables,funcoesSql:functions,enums:[],comentariosSql:["COMMENT ON SCHEMA rpg IS 'Último comentário do esquema';"]}
+  const result=formatText(doc)
+  assert.equal((result.match(/TABELA: tabela_/g)||[]).length,34)
+  assert.match(result,/TABELA: tabela_00/)
+  assert.match(result,/TABELA: tabela_33/)
+  assert.equal((result.match(/CREATE FUNCTION/g)||[]).length,24)
+  assert.ok(result.trimEnd().endsWith(doc.comentariosSql.at(-1)),'O fim do schema deve continuar presente no texto completo.')
+})

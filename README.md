@@ -90,6 +90,12 @@ A barra lateral mantém o campo **Schema** e oferece um seletor no título para 
 
 Clicar numa tabela seleciona o editor visual. Clicar num ENUM abre seus valores e sua definição SQL para consulta e cópia. Clicar numa trigger abre a definição e sua tabela vinculada, com atalho para selecionar a tabela. Clicar numa função abre o editor de funções SQL existente. O botão **+** cria uma tabela ou inicia uma nova função quando a categoria correspondente está ativa. Nenhuma dessas ações executa SQL no PostgreSQL. O nome do projeto continua preservado no JSON existente, mas seu campo foi removido da barra lateral.
 
+## Edição das regras do schema e prévia completa
+
+Na barra lateral, o campo **Schema** tem um botão compacto **Regras**. Ele abre um diálogo para editar o texto das regras do schema, mantendo o autocomplete de funções por `#` e atalhos para navegar até suas definições. O texto é salvo ao clicar em **Salvar regras**; fechar ou cancelar descarta alterações pendentes.
+
+A prévia tem rolagem independente do restante da página, um botão **Fim** que leva diretamente ao último trecho e um rodapé visual que identifica o término da prévia do schema ou da tabela. O rodapé não faz parte do TXT ou JSON copiado ou baixado. A formatação continua a devolver o esquema inteiro, com todas as tabelas e definições.
+
 ## Funções SQL e referências nas regras
 
 O botão **Funções SQL** abre o catálogo de definições importadas ou criadas. É possível buscar, criar um modelo `CREATE OR REPLACE FUNCTION`, editar o SQL completo e excluir uma função. O sistema guarda as definições no JSON do projeto e não executa SQL no banco. Ao renomear uma função pelo editor, o modelador atualiza as referências textuais `#nome` no schema, nas tabelas e nas colunas. Uma função citada em regras não pode ser excluída enquanto suas referências existirem.
