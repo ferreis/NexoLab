@@ -83,7 +83,7 @@ async function render(){
     if(!renderer)renderer=(await import('mermaid')).default
     if(version!==renderVersion)return
     renderer.initialize({
-      startOnLoad:false,securityLevel:'strict',theme:theme.value,
+      startOnLoad:false,securityLevel:'strict',theme:theme.value,htmlLabels:false,
       flowchart:{htmlLabels:false,useMaxWidth:false},
       er:{useMaxWidth:false},
       maxTextSize:600000
