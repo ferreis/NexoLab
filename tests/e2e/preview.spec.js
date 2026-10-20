@@ -285,6 +285,9 @@ test('diagrama ER exibe campos PK/FK, aceita seleção de tabela e exporta SVG',
 })
 test('diagramas preservam layout sem rolagem horizontal em desktop e celular',async({page})=>{
   await openDiagrams(page)
+  const image=page.locator('.diagram-stage img')
+  await expect(image).toBeVisible({timeout:30000})
+  await expect.poll(()=>image.evaluate(el=>el.complete&&el.naturalWidth>0),{timeout:30000}).toBe(true)
   for(const width of [1440,767,390]){
     await page.setViewportSize({width,height:900})
     const size=await page.evaluate(()=>({
