@@ -3,7 +3,7 @@ const text=value=>String(value??'').replace(/[\u0000-\u001f\u007f]/g,' ').trim()
 const normalized=value=>text(value).replace(/^["']|["']$/g,'').toLocaleLowerCase('pt-BR')
 const leaf=value=>text(value).split('.').at(-1).replace(/^["']|["']$/g,'')
 const label=value=>text(value).replace(/[\\\[\]"]/g,"'").replace(/[%<>]/g,char=>'#'+char.charCodeAt(0)+';')
-const erLabel=value=>text(value).replace(/["\\\[\]]/g,"'").replace(/[<>]/g,'')
+const erLabel=value=>text(value).replace(/["\\\[\]]/g,"'").replace(/[%<>]/g,'')
 const attribute=value=>{
   const cleaned=text(value).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9_-]/g,'_')
   return /^[A-Za-z_]/.test(cleaned)?cleaned:'c_'+(cleaned||'sem_nome')
