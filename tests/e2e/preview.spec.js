@@ -16,6 +16,12 @@ const sample={
   }]
 }
 
+async function openPreview(page){
+  await page.getByRole('button',{name:'Selecionar categoria do menu lateral'}).click()
+  await page.getByRole('option',{name:'Prévia'}).click()
+  await expect(page.getByRole('heading',{name:'Prévia do modelo'})).toBeVisible()
+}
+
 test.beforeEach(async({page})=>{
   await page.goto('/')
   await page.evaluate(()=>localStorage.clear())
@@ -28,7 +34,46 @@ test.beforeEach(async({page})=>{
   await expect(page.getByRole('heading',{name:'Estrutura da tabela'})).toBeVisible()
 })
 
-test('prévia TXT da tabela exibe linhas reais e copia exatamente o texto renderizado',async({page,context})=>{
+test('menu lateral estilizado oferece Tabelas, Enum, Triggers, Functions e Prévia',async({page})=>{
+  const trigger=page.getByRole('button',{name:'Selecionar categoria do menu lateral'})
+  await expect(trigger).toHaveAttribute('aria-expanded','false')
+  await trigger.click()
+  await expect(trigger).toHaveAttribute('aria-expanded','true')
+  const options=page.getByRole('listbox',{name:'Categorias do menu lateral'}).getByRole('option')
+  await expect(options).toHaveCount(5)
+  await expect(options.nth(0)).toContainText('Tabelas')
+  await expect(options.nth(1)).toContainText('Enum')
+  await expect(options.nth(2)).toContainText('Triggers')
+  await expect(options.nth(3)).toContainText('Functions')
+  await expect(options.nth(4)).toContainText('Prévia')
+  await page.getByRole('option',{name:'Prévia'}).click()
+  await expect(trigger).toHaveAttribute('aria-expanded','false')
+  await expect(page.getByRole('heading',{name:'Prévia do modelo'})).toBeVisible()
+  await expect(page.locator('aside.preview')).toHaveCount(0)
+  await expect(page.locator('.workspace > aside')).toHaveCount(1)
+})
+
+test('menu abre com teclado, navega por setas e fecha com Escape ou clique externo',async({page})=>{
+  const trigger=page.getByRole('button',{name:'Selecionar categoria do menu lateral'})
+  await trigger.focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(trigger).toHaveAttribute('aria-expanded','true')
+  await page.keyboard.press('End')
+  await expect(page.getByRole('option',{name:'Prévia'})).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('heading',{name:'Prévia do modelo'})).toBeVisible()
+  await expect(trigger).toBeFocused()
+
+  await trigger.click()
+  await page.keyboard.press('Escape')
+  await expect(trigger).toHaveAttribute('aria-expanded','false')
+  await trigger.click()
+  await page.getByRole('heading',{name:'Prévia do modelo'}).click()
+  await expect(trigger).toHaveAttribute('aria-expanded','false')
+})
+
+test('prévia TXT de tabela preserva quebras de linha e copia exatamente o texto exibido',async({page,context})=>{
+  await openPreview(page)
   await page.getByRole('group',{name:'Conteúdo da prévia'}).getByRole('button',{name:/Tabela/}).click()
   const code=page.locator('.preview-scroll pre code')
   await expect(code).toContainText('TABELA: rpg.conhecimentos')
@@ -38,30 +83,87 @@ test('prévia TXT da tabela exibe linhas reais e copia exatamente o texto render
   expect(shown).not.toContain('\\n')
   await context.grantPermissions(['clipboard-read','clipboard-write'])
   await page.getByRole('button',{name:'Copiar tabela atual'}).click()
-  const copied=await page.evaluate(()=>navigator.clipboard.readText())
-  expect(copied).toBe(shown)
+  expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(shown)
 })
 
-test('painel direito permanece inteiro ao rolar a página e permite chegar ao fim da prévia',async({page})=>{
+test('prévia JSON alterna entre esquema completo e tabela selecionada',async({page})=>{
+  await openPreview(page)
+  await page.getByRole('group',{name:'Formato da prévia'}).getByRole('button',{name:'JSON'}).click()
+  const code=page.locator('.preview-scroll pre code')
+  await expect(code).toContainText('"tabelas"')
+  const whole=JSON.parse(await code.textContent())
+  expect(whole.tabelas).toHaveLength(1)
   await page.getByRole('group',{name:'Conteúdo da prévia'}).getByRole('button',{name:/Tabela/}).click()
-  await page.evaluate(()=>window.scrollTo(0,1200))
-  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBeGreaterThan(600)
-  const panel=page.locator('aside.preview')
-  const bounds=await panel.boundingBox()
-  expect(bounds).not.toBeNull()
-  const headerHeight=await page.locator('header.topbar').evaluate(el=>el.getBoundingClientRect().height)
-  const viewportHeight=page.viewportSize().height
-  expect(Math.abs(bounds.y-headerHeight)).toBeLessThanOrEqual(1)
-  expect(Math.abs(bounds.height-(viewportHeight-headerHeight))).toBeLessThanOrEqual(1)
-  expect(Math.abs(bounds.y+bounds.height-viewportHeight)).toBeLessThanOrEqual(1)
+  const selected=JSON.parse(await code.textContent())
+  expect(selected.tabelas).toHaveLength(1)
+  expect(selected.tabelas[0].nome).toBe('conhecimentos')
+  await page.getByRole('group',{name:'Formato da prévia'}).getByRole('button',{name:'TXT'}).click()
+  await expect(code).toContainText('TABELA: rpg.conhecimentos')
+})
 
+test('escolher tabela no menu Prévia mantém prévia aberta e voltar ao editor preserva seleção',async({page})=>{
+  await openPreview(page)
+  await page.getByRole('navigation',{name:'Tabelas para prévia'}).getByRole('button',{name:/conhecimentos/}).click()
+  await expect(page.getByRole('group',{name:'Conteúdo da prévia'}).getByRole('button',{name:/Tabela/})).toHaveAttribute('aria-pressed','true')
+  await expect(page.locator('.preview-scroll pre code')).toContainText('TABELA: rpg.conhecimentos')
+  await page.getByRole('button',{name:'Editar tabelas'}).click()
+  await expect(page.getByRole('heading',{name:'Estrutura da tabela'})).toBeVisible()
+  await expect(page.locator('aside.sidebar .sidebar-category-name')).toHaveText('Tabelas')
+  await expect(page.getByRole('heading',{name:'Prévia do modelo'})).toHaveCount(0)
+})
+
+test('prévia ocupa área central, texto tem rolagem própria e botão Fim alcança rodapé',async({page})=>{
+  await page.setViewportSize({width:1750,height:896})
+  await openPreview(page)
+  const metrics=await page.evaluate(()=>{
+    const rect=selector=>document.querySelector(selector).getBoundingClientRect()
+    const preview=rect('.preview-editor')
+    const sidebar=rect('aside.sidebar')
+    const code=rect('.preview-page-code')
+    const scroll=document.querySelector('.preview-scroll')
+    return {
+      previewLeft:preview.left,previewRight:preview.right,
+      sidebarRight:sidebar.right,codeBottom:code.bottom,
+      scrollHeight:scroll.scrollHeight,clientHeight:scroll.clientHeight,
+      viewportWidth:innerWidth,viewportHeight:innerHeight
+    }
+  })
+  expect(metrics.previewLeft).toBeCloseTo(metrics.sidebarRight,0)
+  expect(metrics.previewRight).toBeCloseTo(metrics.viewportWidth,0)
+  expect(metrics.codeBottom).toBeLessThanOrEqual(metrics.viewportHeight+1)
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight)
+  const windowScroll=await page.evaluate(()=>window.scrollY)
   await page.getByRole('button',{name:'Ir ao final da prévia'}).click()
   await expect(page.locator('.preview-end-marker')).toBeInViewport()
   const scrolled=await page.locator('.preview-scroll').evaluate(el=>({
-    top:el.scrollTop, height:el.clientHeight, content:el.scrollHeight
+    top:el.scrollTop,height:el.clientHeight,content:el.scrollHeight
   }))
-  expect(scrolled.content).toBeGreaterThan(scrolled.height)
   expect(scrolled.top).toBeGreaterThan(0)
+  expect(scrolled.top+scrolled.height).toBeGreaterThanOrEqual(scrolled.content-2)
+  expect(await page.evaluate(()=>window.scrollY)).toBe(windowScroll)
+})
+
+test('prévia responsiva não cria coluna fantasma ou rolagem horizontal',async({page})=>{
+  await openPreview(page)
+  for(const width of [1440,1199,767,390]){
+    await page.setViewportSize({width,height:850})
+    const metrics=await page.evaluate(()=>{
+      const sidebar=document.querySelector('aside.sidebar').getBoundingClientRect()
+      const editor=document.querySelector('main.editor').getBoundingClientRect()
+      return {
+        documentWidth:document.documentElement.scrollWidth,
+        viewportWidth:innerWidth,
+        sidebarRight:sidebar.right,sidebarBottom:sidebar.bottom,
+        editorLeft:editor.left,editorTop:editor.top,editorRight:editor.right,
+        panelCount:document.querySelectorAll('.workspace > aside').length
+      }
+    })
+    expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth)
+    expect(metrics.panelCount).toBe(1)
+    expect(metrics.editorRight).toBeCloseTo(metrics.viewportWidth,0)
+    if(width>767)expect(metrics.editorLeft).toBeCloseTo(metrics.sidebarRight,0)
+    else expect(metrics.editorTop).toBeGreaterThanOrEqual(metrics.sidebarBottom-1)
+  }
 })
 
 test('regras do schema são salvas no popup e cancelar descarta o rascunho',async({page})=>{
@@ -76,136 +178,4 @@ test('regras do schema são salvas no popup e cancelar descarta o rascunho',asyn
   await dialog.getByRole('button',{name:'Salvar regras'}).click()
   await page.getByRole('button',{name:'Editar regras do schema'}).click()
   await expect(dialog.locator('textarea')).toHaveValue('Regra do schema salva.')
-})
-
-
-test('painel fixo permanece completo no fim da página em tela larga',async({page})=>{
-  await page.setViewportSize({width:1750,height:896})
-  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight))
-  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBeGreaterThan(600)
-
-  const metrics=await page.evaluate(()=>{
-    const box=selector=>document.querySelector(selector).getBoundingClientRect()
-    const panel=box('aside.preview')
-    const content=box('aside.preview .code-preview')
-    const scroll=box('aside.preview .preview-scroll')
-    const editor=box('main.editor')
-    const header=box('header.topbar')
-    return {
-      position:getComputedStyle(document.querySelector('aside.preview')).position,
-      top:panel.top,bottom:panel.bottom,right:panel.right,width:panel.width,
-      contentBottom:content.bottom,scrollBottom:scroll.bottom,
-      editorRight:editor.right,headerRight:header.right,headerHeight:header.height,
-      viewportHeight:innerHeight,viewportWidth:innerWidth
-    }
-  })
-  expect(metrics.position).toBe('fixed')
-  expect(metrics.top).toBeCloseTo(metrics.headerHeight,0)
-  expect(metrics.bottom).toBeCloseTo(metrics.viewportHeight,0)
-  expect(metrics.right).toBeCloseTo(metrics.viewportWidth,0)
-  expect(metrics.width).toBe(380)
-  expect(metrics.contentBottom).toBeGreaterThan(metrics.viewportHeight-35)
-  expect(metrics.scrollBottom).toBeGreaterThan(metrics.viewportHeight-35)
-  expect(metrics.editorRight).toBeLessThanOrEqual(metrics.viewportWidth-metrics.width+1)
-  expect(metrics.headerRight).toBeCloseTo(metrics.viewportWidth,0)
-
-  const oldScroll=await page.evaluate(()=>window.scrollY)
-  await page.getByRole('button',{name:'Ir ao final da prévia'}).click()
-  await expect(page.locator('.preview-end-marker')).toBeInViewport()
-  expect(await page.evaluate(()=>window.scrollY)).toBe(oldScroll)
-})
-
-test('recolher e expandir prévia mantém largura reservada sem sobrepor o editor',async({page})=>{
-  await page.setViewportSize({width:1750,height:896})
-  const measure=()=>page.evaluate(()=>{
-    const box=selector=>document.querySelector(selector).getBoundingClientRect()
-    return {
-      panelWidth:box('aside.preview').width,
-      panelTop:box('aside.preview').top,
-      panelBottom:box('aside.preview').bottom,
-      headerHeight:box('header.topbar').height,
-      editorRight:box('main.editor').right,
-      headerRight:box('header.topbar').right,
-      windowWidth:innerWidth
-    }
-  })
-  const expanded=await measure()
-  expect(expanded.panelWidth).toBe(380)
-  await page.getByRole('button',{name:'Recolher prévia'}).click()
-  const collapsed=await measure()
-  expect(collapsed.panelWidth).toBe(48)
-  expect(collapsed.editorRight).toBeGreaterThan(expanded.editorRight)
-  expect(collapsed.headerRight).toBeCloseTo(expanded.headerRight,0)
-  expect(collapsed.editorRight).toBeLessThanOrEqual(collapsed.windowWidth-48+1)
-  expect(collapsed.panelTop).toBeCloseTo(collapsed.headerHeight,0)
-  expect(collapsed.panelBottom).toBe(896)
-
-  await page.getByRole('button',{name:'Expandir prévia'}).click()
-  const reopened=await measure()
-  expect(reopened.panelWidth).toBe(380)
-  expect(reopened.editorRight).toBeCloseTo(expanded.editorRight,0)
-  expect(reopened.headerRight).toBeCloseTo(expanded.headerRight,0)
-  expect(reopened.panelTop).toBeCloseTo(reopened.headerHeight,0)
-})
-
-test('em telas menores o painel volta ao fluxo e não cobre o cabeçalho',async({page})=>{
-  await page.setViewportSize({width:1199,height:800})
-  const measure=()=>page.evaluate(()=>{
-    const panel=document.querySelector('aside.preview')
-    const panelBox=panel.getBoundingClientRect()
-    const headerBox=document.querySelector('header.topbar').getBoundingClientRect()
-    const editorBox=document.querySelector('main.editor').getBoundingClientRect()
-    return {
-      position:getComputedStyle(panel).position,
-      panelWidth:panelBox.width,panelTop:panelBox.top,
-      headerRight:headerBox.right,
-      editorBottom:editorBox.bottom,
-      documentWidth:document.documentElement.scrollWidth,
-      viewportWidth:innerWidth
-    }
-  })
-  let metrics=await measure()
-  expect(metrics.position).toBe('relative')
-  expect(metrics.headerRight).toBeCloseTo(1199,0)
-  expect(metrics.panelWidth).toBeCloseTo(1199,0)
-  expect(metrics.panelTop).toBeGreaterThanOrEqual(metrics.editorBottom-1)
-  expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth)
-
-  await page.setViewportSize({width:390,height:780})
-  metrics=await measure()
-  expect(metrics.position).toBe('relative')
-  expect(metrics.headerRight).toBeCloseTo(390,0)
-  expect(metrics.panelWidth).toBeCloseTo(390,0)
-  expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth)
-})
-
-test('altura dinâmica do cabeçalho mantém painel alinhado à barra esquerda',async({page})=>{
-  await page.setViewportSize({width:1750,height:900})
-  const getLayout=()=>page.evaluate(()=>{
-    const rect=selector=>document.querySelector(selector).getBoundingClientRect()
-    return {
-      headerHeight:rect('header.topbar').height,
-      sidebarTop:rect('aside.sidebar').top,
-      previewTop:rect('aside.preview').top,
-      previewBottom:rect('aside.preview').bottom,
-      viewportHeight:innerHeight
-    }
-  })
-  const initial=await getLayout()
-  expect(initial.previewTop).toBeCloseTo(initial.headerHeight,0)
-  expect(initial.sidebarTop).toBeCloseTo(initial.previewTop,0)
-  expect(initial.previewBottom).toBeCloseTo(initial.viewportHeight,0)
-
-  await page.locator('header.topbar').evaluate(el=>{el.style.height='132px'})
-  await expect.poll(async()=>Math.abs((await getLayout()).previewTop-132)).toBeLessThan(1)
-  const grown=await getLayout()
-  expect(grown.headerHeight).toBeCloseTo(132,0)
-  expect(grown.sidebarTop).toBeCloseTo(grown.previewTop,0)
-  expect(grown.previewBottom).toBeCloseTo(grown.viewportHeight,0)
-
-  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight))
-  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBeGreaterThan(600)
-  const scrolled=await getLayout()
-  expect(scrolled.previewTop).toBeCloseTo(132,0)
-  expect(scrolled.previewBottom).toBeCloseTo(scrolled.viewportHeight,0)
 })

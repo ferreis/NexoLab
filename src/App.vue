@@ -13,11 +13,12 @@ import BulkEditDialog from './components/BulkEditDialog.vue'
 import SqlFunctionManager from './components/SqlFunctionManager.vue'
 import SchemaObjectDialog from './components/SchemaObjectDialog.vue'
 import SchemaRulesDialog from './components/SchemaRulesDialog.vue'
+import SidebarCategoryMenu from './components/SidebarCategoryMenu.vue'
 import { schemaCategories, schemaEntries } from './schemaNavigation.js'
 import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
 import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
-import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, FilePenLine, ArrowDownToLine } from 'lucide-vue-next'
+import { Database, PanelLeftClose, PanelLeftOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, FilePenLine, ArrowDownToLine } from 'lucide-vue-next'
 const store=useModelStore()
 const topbar=ref(null)
 const headerHeight=ref(76)
@@ -36,13 +37,13 @@ onMounted(()=>{
 onUnmounted(()=>headerResizeObserver?.disconnect())
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
-const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null), schemaRulesDialog=ref(null), previewScroll=ref(null)
+const leftOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null), schemaRulesDialog=ref(null), previewScroll=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const sidebarCategory=ref('tables')
-const sidebarCategories=computed(()=>schemaCategories(store.doc))
-const sidebarEntries=computed(()=>schemaEntries(store.doc,sidebarCategory.value))
+const sidebarCategories=computed(()=>[...schemaCategories(store.doc),{value:'preview',label:'Prévia',count:null}])
+const sidebarEntries=computed(()=>schemaEntries(store.doc,sidebarCategory.value==='preview'?'tables':sidebarCategory.value))
 function selectSidebarEntry(entry){
-  if(sidebarCategory.value==='tables'){store.selectedId=entry.tableId;collapseSelectedTable();return}
+  if(sidebarCategory.value==='tables'||sidebarCategory.value==='preview'){store.selectedId=entry.tableId;collapseSelectedTable();if(sidebarCategory.value==='preview')previewScope.value='table';return}
   if(sidebarCategory.value==='functions'){functionDialog.value?.open(entry.label);return}
   objectDialog.value?.open(sidebarCategory.value,entry)
 }
@@ -50,24 +51,12 @@ function addSidebarItem(){
   if(sidebarCategory.value==='tables')store.addTable()
   else if(sidebarCategory.value==='functions')functionDialog.value?.create()
 }
-const previewScope=ref('all'), formatOpen=ref(false)
-const scopeAll=ref(null), scopeTable=ref(null)
-function selectScope(scope){
-  if(previewScope.value===scope)formatOpen.value=!formatOpen.value
-  else{previewScope.value=scope;formatOpen.value=false}
-}
-async function selectFormat(format){
-  tab.value=format
-  formatOpen.value=false
-  await nextTick()
-  ;(previewScope.value==='all'?scopeAll.value:scopeTable.value)?.focus()
-}
-function togglePreview(){rightOpen.value=!rightOpen.value;formatOpen.value=false}
+const previewScope=ref('all')
 function scrollPreviewToEnd(){
   if(previewScroll.value)previewScroll.value.scrollTop=previewScroll.value.scrollHeight
 }
 const previewEndLabel=computed(()=>previewScope.value==='table'?`Fim da prévia da tabela ${store.selected?.nome||''}`:`Fim da prévia do schema ${store.doc.schema||''} (${store.doc.tabelas.length} tabelas)`)
-watch([previewScope,tab,()=>store.selectedId],async()=>{
+watch([previewScope,tab,sidebarCategory,()=>store.selectedId],async()=>{
   await nextTick()
   if(previewScroll.value)previewScroll.value.scrollTop=0
 })
@@ -181,7 +170,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
 </script>
 
 <template>
-<div class="app" :class="{'preview-closed':!rightOpen}" :style="{'--header-height':headerHeight+'px'}">
+<div class="app" :style="{'--header-height':headerHeight+'px'}">
   <header ref="topbar" class="topbar">
     <div class="brand"><Database :size="23"/><div><strong>NexoDB Lab</strong><small>Projetos PostgreSQL e Supabase, sem alterar o banco</small></div></div>
     <div class="top-actions">
@@ -194,17 +183,12 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
       <input ref="fileInput" type="file" accept=".json,application/json" hidden @change="importJson"/>
     </div>
   </header>
-  <div class="workspace" :class="{leftclosed:!leftOpen,rightclosed:!rightOpen}">
+  <div class="workspace" :class="{leftclosed:!leftOpen}">
     <aside class="sidebar panel" :class="{collapsed:!leftOpen}">
       <button v-if="!leftOpen" class="dock-toggle" :title="leftOpen?'Recolher tabelas':'Expandir tabelas'" @click="leftOpen=!leftOpen"><PanelLeftClose v-if="leftOpen" :size="18"/><PanelLeftOpen v-else :size="18"/></button>
       <template v-if="leftOpen">
         <div class="sidehead">
-          <div class="sidebar-category">
-            <select v-model="sidebarCategory" aria-label="Selecionar categoria de objetos do schema" title="Escolher Tabelas, ENUMs, Triggers ou Functions">
-              <option v-for="category in sidebarCategories" :key="category.value" :value="category.value">{{category.label}} ({{category.count}})</option>
-            </select>
-            <ChevronDown :size="14" aria-hidden="true"/>
-          </div>
+          <SidebarCategoryMenu v-model="sidebarCategory" :categories="sidebarCategories"/>
           <div class="panel-actions">
             <button v-if="sidebarCategory==='tables'||sidebarCategory==='functions'" class="iconbtn" :title="sidebarCategory==='tables'?'Criar tabela':'Criar função SQL'" :aria-label="sidebarCategory==='tables'?'Criar tabela':'Criar função SQL'" @click="addSidebarItem"><Plus :size="18"/></button>
             <button class="iconbtn" title="Recolher barra lateral" aria-label="Recolher barra lateral" @click="leftOpen=false"><PanelLeftClose :size="18"/></button>
@@ -225,14 +209,21 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           <summary>Comentários SQL ({{store.doc.comentariosSql.length}})</summary>
           <details v-for="(sql,i) in store.doc.comentariosSql" :key="'comment'+i"><summary>Comentário SQL {{i+1}}</summary><pre>{{sql}}</pre></details>
         </details>
-        <nav :key="sidebarCategory" class="tablelist" :aria-label="'Lista de '+sidebarCategories.find(c=>c.value===sidebarCategory)?.label">
-          <button v-for="entry in sidebarEntries" :key="entry.key" class="tablebtn" :title="entry.tableName?entry.label+' · '+entry.tableName:entry.label" :class="{active:sidebarCategory==='tables'&&store.selectedId===entry.tableId}" @click="selectSidebarEntry(entry)">
-            <Database v-if="sidebarCategory==='tables'" :size="15"/>
+
+        <div v-if="sidebarCategory==='preview'" class="sidebar-preview-scope" role="group" aria-label="Escopo da prévia">
+          <span class="sidebar-preview-caption">Visualizar</span>
+          <button type="button" :class="{active:previewScope==='all'}" :aria-pressed="previewScope==='all'" @click="previewScope='all'"><FileJson :size="15"/> Esquema completo</button>
+          <button type="button" :class="{active:previewScope==='table'}" :aria-pressed="previewScope==='table'" :disabled="!store.selected" @click="previewScope='table'"><Database :size="15"/> Tabela selecionada</button>
+          <span class="sidebar-preview-caption">Escolher tabela</span>
+        </div>
+        <nav :key="sidebarCategory" class="tablelist" :aria-label="sidebarCategory==='preview'?'Tabelas para prévia':'Lista de '+sidebarCategories.find(c=>c.value===sidebarCategory)?.label">
+          <button v-for="entry in sidebarEntries" :key="entry.key" class="tablebtn" :title="entry.tableName?entry.label+' · '+entry.tableName:entry.label"  :class="{active:(sidebarCategory==='tables'||(sidebarCategory==='preview'&&previewScope==='table'))&&store.selectedId===entry.tableId}" @click="selectSidebarEntry(entry)">
+            <Database v-if="sidebarCategory==='tables'||sidebarCategory==='preview'" :size="15"/>
             <List v-else-if="sidebarCategory==='enums'" :size="15"/>
             <Workflow v-else-if="sidebarCategory==='triggers'" :size="15"/>
             <Code2 v-else :size="15"/>
             <span>{{entry.label}}</span>
-            <small v-if="sidebarCategory==='tables'||sidebarCategory==='enums'">{{entry.count}}</small>
+            <small v-if="sidebarCategory==='tables'||sidebarCategory==='enums'||sidebarCategory==='preview'">{{entry.count}}</small>
             <small v-else-if="sidebarCategory==='triggers'" class="sidebar-table-tag">{{entry.tableName}}</small>
           </button>
           <p v-if="!sidebarEntries.length" class="sidebar-empty">Nenhum item nesta categoria.</p>
@@ -244,11 +235,49 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div v-else-if="sidebarCategory==='functions'" class="table-side-actions">
           <button class="btn primary full" @click="functionDialog?.create()"><Plus :size="16"/> Nova função SQL</button>
         </div>
+        <div v-else-if="sidebarCategory==='preview'" class="table-side-actions">
+          <button class="btn full" @click="sidebarCategory='tables'"><Database :size="16"/> Voltar às tabelas</button>
+        </div>
       </template>
     </aside>
-    <main class="editor panel">
+    <main class="editor panel" :class="{'preview-editor':sidebarCategory==='preview'}">
       <p v-if="store.nameError" class="name-error" role="alert">{{store.nameError}} Corrija os nomes para exportar ou copiar o modelo.</p>
-      <template v-if="store.selected">
+      <section v-if="sidebarCategory==='preview'" class="preview-page" aria-label="Prévia do modelo">
+        <div class="sectionhead preview-page-heading">
+          <div><h1>Prévia do modelo</h1><p>Consulte o esquema completo ou apenas uma tabela, em TXT ou JSON.</p></div>
+          <button class="btn" type="button" @click="sidebarCategory='tables'"><Database :size="16"/> Editar tabelas</button>
+        </div>
+        <div class="preview-page-settings">
+          <div class="preview-setting-group">
+            <span>Conteúdo</span>
+            <div class="tabs" role="group" aria-label="Conteúdo da prévia">
+              <button type="button" :class="{active:previewScope==='all'}" :aria-pressed="previewScope==='all'" @click="previewScope='all'">Esquema completo</button>
+              <button type="button" :class="{active:previewScope==='table'}" :aria-pressed="previewScope==='table'" :disabled="!store.selected" @click="previewScope='table'">Tabela{{store.selected?' · '+store.selected.nome:''}}</button>
+            </div>
+          </div>
+          <div class="preview-setting-group preview-format-group">
+            <span>Formato</span>
+            <div class="tabs" role="group" aria-label="Formato da prévia">
+              <button type="button" :class="{active:tab==='txt'}" :aria-pressed="tab==='txt'" @click="tab='txt'">TXT</button>
+              <button type="button" :class="{active:tab==='json'}" :aria-pressed="tab==='json'" @click="tab='json'">JSON</button>
+            </div>
+          </div>
+        </div>
+        <div class="code-preview preview-page-code">
+          <div class="code-toolbar">
+            <span>{{tab.toUpperCase()}} · {{previewScope==='all'?'Esquema completo':store.selected?.nome||'Tabela'}}</span>
+            <div class="preview-toolbar-actions">
+              <button class="code-copy" type="button" title="Ir ao final da prévia" aria-label="Ir ao final da prévia" @click="scrollPreviewToEnd"><ArrowDownToLine :size="15"/> Fim</button>
+              <button class="code-copy" type="button" :title="previewCopyLabel" :aria-label="previewCopyLabel" :disabled="!!store.nameError||(previewScope==='table'&&!store.selected)" @click="copyPreview"><Copy :size="15"/> Copiar</button>
+            </div>
+          </div>
+          <div ref="previewScroll" class="preview-scroll" tabindex="0" aria-label="Conteúdo completo da prévia; use a rolagem para consultar o texto até o final">
+            <pre><code>{{previewScope==='table'&&!store.selected?'Selecione ou crie uma tabela para visualizar.':previewContent}}</code></pre>
+            <div class="preview-end-marker"><span aria-hidden="true">✓</span> {{previewEndLabel}}</div>
+          </div>
+        </div>
+      </section>
+      <template v-else-if="store.selected">
         <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button></div>
         <div class="formgrid">
           <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)"/></label>
@@ -313,35 +342,6 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
       </template>
       <div v-else class="welcome"><Database :size="42"/><h2>Comece com uma tabela</h2><p>Crie seu modelo e exporte uma proposta estruturada.</p><button class="btn primary" @click="store.addTable()"><Plus :size="15"/> Nova tabela</button></div>
     </main>
-    <aside class="preview panel" :class="{collapsed:!rightOpen}" aria-label="Prévia do modelo">
-      <button v-if="!rightOpen" class="dock-toggle" title="Expandir prévia" aria-label="Expandir prévia" @click="togglePreview"><PanelRightOpen :size="18"/></button>
-      <template v-if="rightOpen">
-        <div class="preview-toolbar" @keydown.esc="formatOpen=false">
-          <button class="iconbtn" title="Recolher prévia" aria-label="Recolher prévia" @click="togglePreview"><PanelRightClose :size="18"/></button>
-          <div class="tabs scope-tabs" role="group" aria-label="Conteúdo da prévia">
-            <button ref="scopeAll" :class="{active:previewScope==='all'}" :aria-pressed="previewScope==='all'" :aria-expanded="previewScope==='all'&&formatOpen" aria-controls="preview-formats" title="Esquema · clique novamente para escolher TXT ou JSON" @click="selectScope('all')">Esquema<ChevronDown v-if="previewScope==='all'" :size="12"/></button>
-            <button ref="scopeTable" :class="{active:previewScope==='table'}" :aria-pressed="previewScope==='table'" :aria-expanded="previewScope==='table'&&formatOpen" aria-controls="preview-formats" title="Tabela · clique novamente para escolher TXT ou JSON" @click="selectScope('table')">Tabela<ChevronDown v-if="previewScope==='table'" :size="12"/></button>
-          </div>
-        </div>
-        <div v-if="formatOpen" id="preview-formats" class="format-picker" role="group" aria-label="Formato da prévia" @keydown.esc.stop="selectFormat(tab)">
-          <button :class="{active:tab==='txt'}" :aria-pressed="tab==='txt'" @click="selectFormat('txt')">TXT</button>
-          <button :class="{active:tab==='json'}" :aria-pressed="tab==='json'" @click="selectFormat('json')">JSON</button>
-        </div>
-        <div class="code-preview">
-          <div class="code-toolbar">
-            <span>{{tab.toUpperCase()}}</span>
-            <div class="preview-toolbar-actions">
-              <button class="code-copy" type="button" title="Ir ao final da prévia" aria-label="Ir ao final da prévia" @click="scrollPreviewToEnd"><ArrowDownToLine :size="14"/>Fim</button>
-              <button class="code-copy" type="button" :title="previewCopyLabel" :aria-label="previewCopyLabel" :disabled="!!store.nameError||(previewScope==='table'&&!store.selected)" @click="copyPreview"><Copy :size="14"/>Copiar</button>
-            </div>
-          </div>
-          <div ref="previewScroll" class="preview-scroll" tabindex="0" aria-label="Conteúdo completo da prévia; use a rolagem para consultar o texto até o final">
-            <pre><code>{{previewScope==='table'&&!store.selected?'Selecione ou crie uma tabela para visualizar.':previewContent}}</code></pre>
-            <div class="preview-end-marker"><span aria-hidden="true">✓</span> {{previewEndLabel}}</div>
-          </div>
-        </div>
-      </template>
-    </aside>
   </div>
   <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
   <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>

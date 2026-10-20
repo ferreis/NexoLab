@@ -21,7 +21,7 @@ O campo **Comentário**, abaixo do nome da tabela, aceita explicações em vári
 Cada coluna também possui um campo **Comentário**, separado de **Regra**. O JSON da coluna guarda `comentario` e o comando gerado em `comentario_sql`; o TXT apresenta `COMMENT ON COLUMN "schema"."tabela"."coluna" IS 'texto';` logo após a linha da coluna. O comentário acompanha renomeações de schema, tabela e coluna, com a mesma preservação de texto e escape usados nos comentários de tabela.
 
 
-A opção **Tabela** na prévia TXT/JSON mostra somente a tabela selecionada, suas colunas e suas restrições, triggers, índices e políticas específicas. Objetos globais do schema (ENUMs, funções e comentários gerais) aparecem apenas na opção **Esquema**.
+A opção **Prévia**, no seletor do menu lateral esquerdo, abre uma página central dedicada a TXT/JSON. A opção **Tabela** mostra somente a tabela selecionada, suas colunas e seus relacionamentos e CHECKs; objetos globais do schema (ENUMs, funções e comentários gerais) aparecem apenas em **Esquema completo**.
 
 ## Edição em massa e refatoração de FKs
 
@@ -55,8 +55,8 @@ Tipos não representados no seletor visual são registrados como **CUSTOM**, man
 - Valor padrão na criação, opção de coluna imutável e regras em texto livre, incluídos nas propostas TXT/JSON.
 - Suporte a ENUM, VARCHAR, NUMERIC, tipos comuns do PostgreSQL, PK, FK, NULL e UNIQUE.
 - Ajuda contextual para os tipos de dados.
-- Painéis esquerdo e direito recolhíveis com botões sempre acessíveis.
-- Prévia TXT/JSON atualizada automaticamente, com abas para o projeto inteiro ou apenas a tabela selecionada; copiar acompanha a aba ativa.
+- Menu lateral esquerdo recolhível com seletor personalizado e navegação por Tabelas, Enum, Triggers, Functions e Prévia.
+- Prévia TXT/JSON em tela central, com alternância entre esquema completo e tabela selecionada, cópia fiel e rolagem própria.
 - Reordenação das colunas pela alça de arrastar ou pelas setas do teclado, mantendo ID e datas fixos; ordem preservada ao salvar e exportar.
 - Exportação TXT/JSON e importação do JSON da ferramenta HTML anterior.
 - Persistência automática local via `localStorage`.
@@ -86,7 +86,7 @@ O TXT documenta UNIQUE individual e UNIQUE Compose apenas na linha da coluna de 
 
 ## Navegação por objetos do schema
 
-A barra lateral mantém o campo **Schema** e oferece um seletor no título para alternar entre **Tabelas**, **Enum**, **Triggers** e **Functions**. O número ao lado de cada categoria vem dos objetos existentes no projeto importado: tabelas, enums, triggers registradas nas tabelas e funções SQL globais. A lista é ordenada alfabeticamente.
+A barra lateral mantém o campo **Schema** e oferece um seletor estilizado no título para alternar entre **Tabelas**, **Enum**, **Triggers**, **Functions** e **Prévia**. O menu suporta teclado (setas, Home, End, Enter e Escape), clique externo para fechar e destaca a categoria ativa. Os contadores mostram objetos existentes no projeto: tabelas, enums, triggers registradas nas tabelas e funções SQL globais. A lista é ordenada alfabeticamente.
 
 Clicar numa tabela seleciona o editor visual. Clicar num ENUM abre seus valores e sua definição SQL para consulta e cópia. Clicar numa trigger abre a definição e sua tabela vinculada, com atalho para selecionar a tabela. Clicar numa função abre o editor de funções SQL existente. O botão **+** cria uma tabela ou inicia uma nova função quando a categoria correspondente está ativa. Nenhuma dessas ações executa SQL no PostgreSQL. O nome do projeto continua preservado no JSON existente, mas seu campo foi removido da barra lateral.
 
@@ -94,7 +94,7 @@ Clicar numa tabela seleciona o editor visual. Clicar num ENUM abre seus valores 
 
 Na barra lateral, o campo **Schema** tem um botão compacto **Regras**. Ele abre um diálogo para editar o texto das regras do schema, mantendo o autocomplete de funções por `#` e atalhos para navegar até suas definições. O texto é salvo ao clicar em **Salvar regras**; fechar ou cancelar descarta alterações pendentes.
 
-A prévia tem rolagem independente do restante da página, um botão **Fim** que leva diretamente ao último trecho e um rodapé visual que identifica o término da prévia do schema ou da tabela. O rodapé não faz parte do TXT ou JSON copiado ou baixado. A formatação continua a devolver o esquema inteiro, com todas as tabelas e definições.
+Escolha **Prévia** no seletor lateral para abrir o visualizador na área central, sem painel direito. Use **Esquema completo** ou **Tabela**, escolha **TXT** ou **JSON** e clique em **Copiar** para obter exatamente o texto exibido. O menu esquerdo permite escolher uma tabela sem sair da prévia. O texto possui rolagem independente, um botão **Fim** que leva ao último trecho e um rodapé visual que identifica o término. O rodapé não integra o conteúdo copiado ou baixado. Os botões de download do cabeçalho continuam exportando o projeto completo.
 
 ## Funções SQL e referências nas regras
 
@@ -114,7 +114,7 @@ npm audit --omit=dev --audit-level=high
 
 ### Testes de interface com Playwright
 
-O Playwright testa o painel lateral direito no Chromium, a navegação até o fim da prévia, as quebras de linha reais no TXT, a cópia para a área de transferência e o salvamento/cancelamento das regras do schema. A versão do Playwright é fixada no CI e instalada sem alterar o lockfile do projeto.
+O Playwright testa o seletor lateral acessível, a navegação entre editor e prévia central, a responsividade, a rolagem independente até o fim, as quebras de linha reais no TXT, a cópia para a área de transferência e o salvamento/cancelamento das regras do schema. A versão do Playwright é fixada no CI e instalada sem alterar o lockfile do projeto.
 
 ```bash
 npm ci
@@ -125,7 +125,7 @@ npm run test:e2e
 
 No GitHub Actions, os testes unitários, a compilação e o Playwright são executados automaticamente na branch `Dev` e nas PRs. O workflow não publica nada no Cloudflare.
 
-A prévia **Tabela** separa linhas com quebras de linha reais, inclusive no texto copiado. No desktop (largura a partir de 1200px), o painel direito fica fixo **abaixo do cabeçalho**, alinhado ao início do menu lateral esquerdo, independentemente da rolagem do editor. A altura do cabeçalho é acompanhada automaticamente para não haver sobreposição quando ele cresce. O cabeçalho ocupa toda a largura da página e o editor reserva a largura da prévia, inclusive recolhida. Em telas menores, a prévia retorna ao fluxo normal abaixo do editor e mantém rolagem interna do TXT/JSON.
+A prévia **Tabela** separa linhas com quebras de linha reais, inclusive no texto copiado. O layout usa apenas duas colunas no desktop: menu lateral esquerdo e editor ou prévia central. Não há painel direito, espaço vazio reservado ou sobreposição ao cabeçalho. Em telas menores, o menu lateral aparece acima do editor; o TXT/JSON mantém rolagem interna.
 
 Nomes de tabelas devem ser únicos no projeto; nomes de colunas devem ser únicos dentro de cada tabela. A comparação ignora maiúsculas/minúsculas e espaços nas pontas. Nomes repetidos são rejeitados ao sair do campo ou pressionar Enter, mantendo o nome anterior. Importações com duplicatas são recusadas. Projetos antigos com duplicatas continuam disponíveis para correção, com exportação e cópia bloqueadas até resolver os conflitos.
 
