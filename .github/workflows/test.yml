@@ -12,17 +12,26 @@ permissions:
 
 jobs:
   test:
+    name: Validar código, compilação e navegação com Playwright
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Obter código do repositório
+        uses: actions/checkout@v4
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
-      - name: Instalar dependências
+      - name: Instalar dependências do projeto
         run: npm ci
-      - name: Testar
+      - name: Executar testes unitários
         run: npm test
-      - name: Compilar
+      - name: Compilar aplicação para produção
         run: npm run build
+      - name: Instalar Playwright fixado sem alterar o lockfile
+        run: npm install --no-save --package-lock=false --ignore-scripts @playwright/test@1.56.1
+      - name: Preparar navegador Chromium para testes de interface
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Executar testes automatizados de interface com Playwright
+        run: npm run test:e2e
