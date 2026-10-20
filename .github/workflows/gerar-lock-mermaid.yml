@@ -35,7 +35,14 @@ jobs:
           git add package-lock.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: sincronizar lockfile Mermaid"
-            git fetch origin Dev
-            git rebase origin/Dev
-            git push origin HEAD:Dev
+            for tentativa in 1 2 3 4 5; do
+              git fetch origin +refs/heads/Dev:refs/remotes/origin/Dev
+              git rebase origin/Dev
+              if git push origin HEAD:Dev; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "Não foi possível atualizar o lockfile após cinco tentativas." >&2
+            exit 1
           fi
