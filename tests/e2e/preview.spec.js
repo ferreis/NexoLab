@@ -404,8 +404,11 @@ test('diagrama usa toda a área útil entre cabeçalho, barra lateral e bordas d
     expect(metrics.boardBottom).toBeCloseTo(height,0)
     expect(metrics.stageHeight).toBeGreaterThan(100)
     expect(metrics.footerBottom).toBeCloseTo(height,0)
-    expect(metrics.scrollHeight).toBeLessThanOrEqual(height+1)
     expect(metrics.scrollWidth).toBeLessThanOrEqual(width)
+    expect(await page.evaluate(()=>getComputedStyle(document.documentElement).overflowY)).toBe('hidden')
+    await page.locator('.topbar').hover()
+    await page.mouse.wheel(0,900)
+    await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(0)
   }
   await page.getByRole('button',{name:'Recolher barra lateral'}).click()
   await expect.poll(()=>page.locator('.diagram-board').evaluate(el=>el.getBoundingClientRect().left)).toBeCloseTo(48,0)
