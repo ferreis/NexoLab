@@ -6,6 +6,7 @@ on:
     branches: [Dev]
     paths:
       - package.json
+      - .github/workflows/gerar-lock-mermaid.yml
 
 permissions:
   contents: write
@@ -34,5 +35,7 @@ jobs:
           git add package-lock.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: sincronizar lockfile Mermaid"
+            git fetch origin Dev
+            git rebase origin/Dev
             git push origin HEAD:Dev
           fi
