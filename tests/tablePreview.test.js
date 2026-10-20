@@ -75,3 +75,23 @@ test('prévia contém regras e relacionamentos mas omite SQL operacional',()=>{
   assert.match(text,/FK -> outra.id/)
   assert.doesNotMatch(text,/CREATE POLICY/)
 })
+
+
+test('TXT de tabela usa quebras reais e nunca insere o texto literal barra-n',()=>{
+  const preview=tablePreview(model,0)
+  const txt=formatTablePreviewText(preview)
+  assert.ok(txt.includes('TABELA: rpg.arcos\n\nColunas:\n- id: BIGINT'))
+  assert.ok(txt.includes('\n  Regra: Identificador único automático.'))
+  assert.equal(txt.includes('\\n'),false,'O separador deve ser uma quebra de linha real.')
+  assert.ok(txt.split('\n').length>=5)
+})
+
+test('TXT de tabela preserva comentários multilinha e CHECKs em linhas próprias',()=>{
+  const project=structuredClone(model)
+  project.tabelas[0].comentario='Primeira linha.\nSegunda linha.'
+  project.tabelas[0].colunas[0].checks=[{expressao:'id > 0'}]
+  const txt=formatTablePreviewText(tablePreview(project,0))
+  assert.match(txt,/Descrição: Primeira linha\.\nSegunda linha\.\n\nColunas:/)
+  assert.match(txt,/\n- id: BIGINT[^\n]*\n  Regra: Identificador único automático\.\n  CHECK \(id > 0\)/)
+  assert.equal(txt.includes('\\n'),false)
+})

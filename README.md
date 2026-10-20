@@ -109,7 +109,23 @@ Na prévia **Tabela**, TXT e JSON mostram apenas informações próprias da tabe
 ```bash
 npm test
 npm run build
+npm audit --omit=dev --audit-level=high
 ```
+
+### Testes de interface com Playwright
+
+O Playwright testa o painel lateral direito no Chromium, a navegação até o fim da prévia, as quebras de linha reais no TXT, a cópia para a área de transferência e o salvamento/cancelamento das regras do schema. A versão do Playwright é fixada no CI e instalada sem alterar o lockfile do projeto.
+
+```bash
+npm ci
+npm install --no-save --package-lock=false --ignore-scripts @playwright/test@1.56.1
+npx --no-install playwright install chromium
+npm run test:e2e
+```
+
+No GitHub Actions, os testes unitários, a compilação e o Playwright são executados automaticamente na branch `Dev` e nas PRs. O workflow não publica nada no Cloudflare.
+
+A prévia **Tabela** separa linhas com quebras de linha reais, inclusive no texto copiado. No desktop (largura a partir de 1200px), o painel direito usa posicionamento fixo em relação à janela, independente da altura do editor, ocupando toda a altura visível até a base da tela. O cabeçalho e o editor reservam a largura do painel, mesmo quando ele é recolhido, evitando sobreposição. Em telas menores, a prévia retorna ao fluxo normal abaixo do editor e mantém rolagem interna do TXT/JSON.
 
 Nomes de tabelas devem ser únicos no projeto; nomes de colunas devem ser únicos dentro de cada tabela. A comparação ignora maiúsculas/minúsculas e espaços nas pontas. Nomes repetidos são rejeitados ao sair do campo ou pressionar Enter, mantendo o nome anterior. Importações com duplicatas são recusadas. Projetos antigos com duplicatas continuam disponíveis para correção, com exportação e cópia bloqueadas até resolver os conflitos.
 

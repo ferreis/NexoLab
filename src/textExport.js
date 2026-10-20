@@ -63,5 +63,5 @@ export function formatTablePreviewText(preview){
     lines.push('','Restrições relacionais e CHECKs adicionais:')
     for(const sql of t.sqlRestricoes)lines.push(`- ${sql}`)
   }
-  return lines.join('\\n')
+  return lines.join('\n')
 }
