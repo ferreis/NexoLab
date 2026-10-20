@@ -247,7 +247,7 @@ test('visualiza mapa Mermaid de FKs, permite zoom e copia código sem sair do ap
   await expect(img).toHaveAttribute('src',/^blob:/,{timeout:30000})
   await expect.poll(()=>img.evaluate(el=>el.complete&&el.naturalWidth>0),{timeout:30000}).toBe(true)
   await expect(page.locator('.diagram-counts')).toContainText('3 tabela(s) · 2 ligação(ões)')
-  await expect(page.locator('.diagram-warning')).toContainText('externa')
+  await expect(page.locator('.diagram-warning')).toHaveCount(0)
   await page.getByRole('group',{name:'Tipo de diagrama'}).getByRole('button',{name:'Código'}).click()
   const code=page.locator('.diagram-code-stage code')
   await expect(code).toContainText('flowchart LR')
@@ -373,5 +373,82 @@ test('código Mermaid tem rolagem interna em telas estreitas, sem ampliar largur
     expect(size.documentWidth).toBeLessThanOrEqual(size.viewportWidth)
     expect(size.stageWidth).toBeGreaterThan(150)
     expect(size.scrollWidth).toBeGreaterThanOrEqual(Math.floor(size.stageWidth))
+  }
+})
+
+test('diagrama usa toda a área útil entre cabeçalho, barra lateral e bordas da janela',async({page})=>{
+  await openDiagrams(page)
+  for(const {width,height} of [{width:1741,height:864},{width:1440,height:900},{width:1024,height:768},{width:768,height:700}]){
+    await page.setViewportSize({width,height})
+    await expect.poll(()=>page.evaluate(()=>{
+      const board=document.querySelector('.diagram-board').getBoundingClientRect()
+      const header=document.querySelector('.topbar').getBoundingClientRect()
+      return Math.abs(board.top-header.bottom)+Math.abs(board.bottom-innerHeight)
+    })).toBeLessThan(2)
+    const metrics=await page.evaluate(()=>{
+      const board=document.querySelector('.diagram-board').getBoundingClientRect()
+      const sidebar=document.querySelector('.sidebar').getBoundingClientRect()
+      const stage=document.querySelector('.diagram-stage').getBoundingClientRect()
+      const toolbar=document.querySelector('.diagram-toolbar').getBoundingClientRect()
+      const footer=document.querySelector('.diagram-board-footer').getBoundingClientRect()
+      return {
+        boardLeft:board.left,boardRight:board.right,boardBottom:board.bottom,
+        sidebarRight:sidebar.right,stageHeight:stage.height,
+        toolbarTop:toolbar.top,footerBottom:footer.bottom,
+        scrollHeight:document.documentElement.scrollHeight,
+        scrollWidth:document.documentElement.scrollWidth
+      }
+    })
+    expect(metrics.boardLeft).toBeCloseTo(metrics.sidebarRight,0)
+    expect(metrics.boardRight).toBeCloseTo(width,0)
+    expect(metrics.boardBottom).toBeCloseTo(height,0)
+    expect(metrics.stageHeight).toBeGreaterThan(100)
+    expect(metrics.footerBottom).toBeCloseTo(height,0)
+    expect(metrics.scrollHeight).toBeLessThanOrEqual(height+1)
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(width)
+  }
+  await page.getByRole('button',{name:'Recolher barra lateral'}).click()
+  await expect.poll(()=>page.locator('.diagram-board').evaluate(el=>el.getBoundingClientRect().left)).toBeCloseTo(48,0)
+  await expect(page.locator('.diagram-stage')).toBeVisible()
+  await page.getByRole('button',{name:'Expandir tabelas'}).click()
+  await expect.poll(()=>page.evaluate(()=>{
+    const board=document.querySelector('.diagram-board').getBoundingClientRect()
+    const sidebar=document.querySelector('.sidebar').getBoundingClientRect()
+    return Math.abs(board.left-sidebar.right)
+  })).toBeLessThan(1)
+})
+test('sem aviso de FK externa, o Mermaid mantém a referência e a visão Código ocupa a área disponível',async({page})=>{
+  await openDiagrams(page)
+  await expect(page.getByText(/FKs sem tabela correspondente no modelo/)).toHaveCount(0)
+  await expect(page.locator('.diagram-warning')).toHaveCount(0)
+  await page.getByRole('group',{name:'Tipo de diagrama'}).getByRole('button',{name:'Código'}).click()
+  const code=page.locator('.diagram-code-stage code')
+  await expect(code).toContainText('externa')
+  await expect(code).toContainText('não encontrada')
+  const metrics=await page.evaluate(()=>{
+    const board=document.querySelector('.diagram-board').getBoundingClientRect()
+    const stage=document.querySelector('.diagram-code-stage').getBoundingClientRect()
+    const toolbar=document.querySelector('.diagram-toolbar').getBoundingClientRect()
+    const footer=document.querySelector('.diagram-board-footer').getBoundingClientRect()
+    return {stageTop:stage.top,stageBottom:stage.bottom,stageLeft:stage.left,stageRight:stage.right,toolbarBottom:toolbar.bottom,footerTop:footer.top,boardRight:board.right}
+  })
+  expect(metrics.stageTop).toBeCloseTo(metrics.toolbarBottom,0)
+  expect(metrics.stageBottom).toBeCloseTo(metrics.footerTop,0)
+  expect(metrics.stageRight).toBeCloseTo(metrics.boardRight,0)
+})
+test('diagrama sem margens laterais no celular e sem rolagem horizontal',async({page})=>{
+  await openDiagrams(page)
+  for(const {width,height} of [{width:767,height:900},{width:390,height:850}]){
+    await page.setViewportSize({width,height})
+    const metrics=await page.evaluate(()=>{
+      const board=document.querySelector('.diagram-board').getBoundingClientRect()
+      const editor=document.querySelector('.diagram-editor').getBoundingClientRect()
+      const sidebar=document.querySelector('.sidebar').getBoundingClientRect()
+      return {boardLeft:board.left,boardRight:board.right,boardTop:board.top,editorTop:editor.top,sidebarBottom:sidebar.bottom,scrollWidth:document.documentElement.scrollWidth}
+    })
+    expect(metrics.boardLeft).toBeCloseTo(0,0)
+    expect(metrics.boardRight).toBeCloseTo(width,0)
+    expect(metrics.boardTop).toBeGreaterThanOrEqual(metrics.sidebarBottom-1)
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(width)
   }
 })
