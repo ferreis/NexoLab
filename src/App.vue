@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useModelStore, TYPES, isDefaultColumn } from './stores/modelador'
 import TableCombobox from './components/TableCombobox.vue'
 import NameInput from './components/NameInput.vue'
@@ -19,6 +19,21 @@ import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
 import { Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, FilePenLine, ArrowDownToLine } from 'lucide-vue-next'
 const store=useModelStore()
+const topbar=ref(null)
+const headerHeight=ref(76)
+let headerResizeObserver
+onMounted(()=>{
+  if(!topbar.value)return
+  const updateHeaderHeight=()=>{
+    headerHeight.value=topbar.value.getBoundingClientRect().height
+  }
+  updateHeaderHeight()
+  if(typeof ResizeObserver!=='undefined'){
+    headerResizeObserver=new ResizeObserver(updateHeaderHeight)
+    headerResizeObserver.observe(topbar.value)
+  }
+})
+onUnmounted(()=>headerResizeObserver?.disconnect())
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
 const leftOpen=ref(true), rightOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null), schemaRulesDialog=ref(null), previewScroll=ref(null)
@@ -166,8 +181,8 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
 </script>
 
 <template>
-<div class="app" :class="{'preview-closed':!rightOpen}">
-  <header class="topbar">
+<div class="app" :class="{'preview-closed':!rightOpen}" :style="{'--header-height':headerHeight+'px'}">
+  <header ref="topbar" class="topbar">
     <div class="brand"><Database :size="23"/><div><strong>NexoDB Lab</strong><small>Projetos PostgreSQL e Supabase, sem alterar o banco</small></div></div>
     <div class="top-actions">
       <button class="btn ghost" @click="fileInput?.click()"><Upload :size="15"/> Importar JSON</button>
