@@ -20,7 +20,7 @@ test.beforeEach(async({page})=>{
   await page.goto('/')
   await page.evaluate(()=>localStorage.clear())
   await page.reload()
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.locator('.topbar input[type="file"]').setInputFiles({
     name:'modelo-teste.json',
     mimeType:'application/json',
     buffer:Buffer.from(JSON.stringify(sample),'utf8')
