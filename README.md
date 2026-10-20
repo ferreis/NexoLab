@@ -25,12 +25,13 @@ A opção **Prévia**, no seletor do menu lateral esquerdo, abre uma página cen
 
 ## Diagramas Mermaid: mapa de ligações e diagrama ER
 
-No seletor do menu lateral, escolha **Diagramas**. O visualizador usa o modelo local para gerar dois tipos de diagrama Mermaid, atualizados automaticamente conforme as tabelas são editadas:
+No seletor do menu lateral, escolha **Diagramas**. O visualizador usa o modelo local para gerar duas representações gráficas e uma visualização de código Mermaid, atualizadas automaticamente conforme as tabelas são editadas:
 
 - **Ligações**: mapa de dependências das FKs (setas da tabela que contém a FK para a tabela referenciada), incluindo tabelas sem relações e aviso para referências externas ausentes.
 - **Banco ER**: entidades com suas colunas, tipos, PK, FK, UNIQUE individual, indicação de NULL/NOT NULL e relacionamentos com cardinalidade aproximada a partir das FKs. CHECKs, UNIQUEs compostos e triggers permanecem documentados no editor e no JSON, pois não cabem integralmente na notação ER.
+- **Código**: substitui o mapa pelo código Mermaid gerado para o último tipo gráfico selecionado (Ligações ou Banco ER). Ao voltar ao mapa, a seleção é preservada.
 
-Escolha **Todas as tabelas** ou **Tabela e ligações** para destacar a tabela selecionada e suas vizinhas. Também é possível mudar a direção horizontal/vertical, alternar tema claro/escuro, ampliar com a roda do mouse, arrastar o canvas e ajustar à tela. Os botões permitem **copiar o código Mermaid**, baixar `.mmd`, **SVG** e **PNG**. A seção de código pode ser aberta para copiar e editar no MermaidView.
+Escolha **Todas as tabelas** ou **Tabela e ligações** para destacar a tabela selecionada e suas vizinhas. As opções **Visualização**, **Direção** e **Tema** ficam na barra superior do diagrama. É possível ampliar com a roda do mouse, arrastar o canvas e ajustar à tela. Os botões **Copiar Mermaid**, **Baixar .mmd**, **SVG** e **PNG** ficam no rodapé do próprio diagrama. A aba **Código** exibe o Mermaid em toda a área de visualização, com rolagem interna, substituindo a antiga seção de código separada.
 
 A renderização usa a dependência Mermaid instalada localmente e o nível de segurança `strict`. O SVG é exibido como imagem em vez de HTML ativo. Nenhum esquema é enviado a um serviço externo, e o visualizador não modifica o banco nem executa SQL.
 

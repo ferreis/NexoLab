@@ -8,8 +8,13 @@ const props=defineProps({
   selectedId:{type:String,default:null},
   scope:{type:String,default:'all'}
 })
-const mode=ref('links'),direction=ref('LR'),theme=ref('dark')
-const source=computed(()=>mode.value==='links'
+const mode=ref('links'),lastDiagram=ref('links'),direction=ref('LR'),theme=ref('dark')
+const activeDiagram=computed(()=>mode.value==='code'?lastDiagram.value:mode.value)
+function setMode(value){
+  if(value!=='code')lastDiagram.value=value
+  mode.value=value
+}
+const source=computed(()=>activeDiagram.value==='links'
   ?mermaidConnections(props.model,{scope:props.scope,selectedId:props.selectedId,direction:direction.value})
   :mermaidDatabase(props.model,{scope:props.scope,selectedId:props.selectedId,direction:direction.value}))
 const summary=computed(()=>diagramModel(props.model,{scope:props.scope,selectedId:props.selectedId}))
@@ -18,7 +23,7 @@ const position=ref({x:0,y:0}),scale=ref(1)
 const loading=ref(false),error=ref(''),message=ref('')
 let renderer=null,renderVersion=0,renderId=0,observer=null,drag=null,hasMoved=false
 
-const diagramTitle=computed(()=>mode.value==='links'?'Mapa de ligações':'Diagrama do banco')
+const diagramTitle=computed(()=>mode.value==='code'?'Código Mermaid':activeDiagram.value==='links'?'Mapa de ligações':'Diagrama do banco')
 const transform=computed(()=>`translate(${position.value.x}px,${position.value.y}px) scale(${scale.value})`)
 function bounds(svg){
   const match=svg.match(/\bviewBox="([^"]+)"/i)
@@ -105,6 +110,11 @@ async function render(){
   }
 }
 watch([source,theme],render,{immediate:true})
+watch(mode,async(value)=>{
+  if(value==='code')return
+  await nextTick()
+  if(imageUrl.value)fit()
+})
 onMounted(()=>{
   if(typeof ResizeObserver!=='undefined'&&viewport.value){
     observer=new ResizeObserver(()=>{if(!hasMoved&&imageUrl.value)fit()})
@@ -122,7 +132,7 @@ function save(blob,filename){
   link.href=url;link.download=filename;link.click()
   setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
-const filename=computed(()=>mode.value==='links'?'nexodb-ligacoes':'nexodb-banco-er')
+const filename=computed(()=>activeDiagram.value==='links'?'nexodb-ligacoes':'nexodb-banco-er')
 function exportMermaid(){save(new Blob([source.value+'\n'],{type:'text/plain;charset=utf-8'}),filename.value+'.mmd')}
 function exportSvg(){
   if(!imageUrl.value)return
@@ -156,39 +166,39 @@ async function copyCode(){
 </script>
 
 <template>
-  <section class="diagram-page" aria-label="Diagramas Mermaid do modelo">
-    <div class="sectionhead diagram-page-heading">
-      <div><h1>Diagramas Mermaid</h1><p>Explore as ligações entre tabelas ou a estrutura do banco. Atualização automática, sem conexão com o PostgreSQL.</p></div>
-      <span class="diagram-counts">{{summary.tables.length}} tabela(s) · {{summary.edges.length}} ligação(ões)</span>
-    </div>
-    <div class="diagram-controls">
-      <div class="diagram-control-set">
-        <span>Visualização</span>
-        <div class="tabs" role="group" aria-label="Tipo de diagrama">
-          <button type="button" :class="{active:mode==='links'}" :aria-pressed="mode==='links'" @click="mode='links'"><Network :size="15"/> Ligações</button>
-          <button type="button" :class="{active:mode==='er'}" :aria-pressed="mode==='er'" @click="mode='er'"><Database :size="15"/> Banco ER</button>
-        </div>
-      </div>
-      <div class="diagram-control-set">
-        <span>Direção</span>
-        <div class="tabs" role="group" aria-label="Direção do diagrama">
-          <button type="button" :class="{active:direction==='LR'}" :aria-pressed="direction==='LR'" @click="direction='LR'">Horizontal</button>
-          <button type="button" :class="{active:direction==='TB'}" :aria-pressed="direction==='TB'" @click="direction='TB'">Vertical</button>
-        </div>
-      </div>
-      <div class="diagram-control-set">
-        <span>Tema</span>
-        <div class="tabs" role="group" aria-label="Tema do diagrama">
-          <button type="button" :class="{active:theme==='dark'}" :aria-pressed="theme==='dark'" @click="theme='dark'">Escuro</button>
-          <button type="button" :class="{active:theme==='default'}" :aria-pressed="theme==='default'" @click="theme='default'">Claro</button>
-        </div>
-      </div>
-    </div>
+  <section class="diagram-page" aria-label="Diagramas do modelo">
     <p v-if="summary.unresolved.length" class="diagram-warning">FKs sem tabela correspondente no modelo: {{summary.unresolved.join(', ')}}. Elas aparecem como referências externas.</p>
     <div class="diagram-board">
       <div class="diagram-toolbar">
-        <strong>{{diagramTitle}}</strong>
-        <div class="diagram-toolbar-actions">
+        <div class="diagram-toolbar-main">
+          <strong>{{diagramTitle}}</strong>
+          <span class="diagram-counts">{{summary.tables.length}} tabela(s) · {{summary.edges.length}} ligação(ões)</span>
+        </div>
+        <div class="diagram-controls">
+          <div class="diagram-control-set">
+            <span>Visualização</span>
+            <div class="tabs" role="group" aria-label="Tipo de diagrama">
+              <button type="button" :class="{active:mode==='links'}" :aria-pressed="mode==='links'" @click="setMode('links')"><Network :size="15"/> Ligações</button>
+              <button type="button" :class="{active:mode==='er'}" :aria-pressed="mode==='er'" @click="setMode('er')"><Database :size="15"/> Banco ER</button>
+              <button type="button" :class="{active:mode==='code'}" :aria-pressed="mode==='code'" @click="setMode('code')"><Code2 :size="15"/> Código</button>
+            </div>
+          </div>
+          <div class="diagram-control-set">
+            <span>Direção</span>
+            <div class="tabs" role="group" aria-label="Direção do diagrama">
+              <button type="button" :class="{active:direction==='LR'}" :aria-pressed="direction==='LR'" @click="direction='LR'">Horizontal</button>
+              <button type="button" :class="{active:direction==='TB'}" :aria-pressed="direction==='TB'" @click="direction='TB'">Vertical</button>
+            </div>
+          </div>
+          <div class="diagram-control-set">
+            <span>Tema</span>
+            <div class="tabs" role="group" aria-label="Tema do diagrama">
+              <button type="button" :class="{active:theme==='dark'}" :aria-pressed="theme==='dark'" @click="theme='dark'">Escuro</button>
+              <button type="button" :class="{active:theme==='default'}" :aria-pressed="theme==='default'" @click="theme='default'">Claro</button>
+            </div>
+          </div>
+        </div>
+        <div v-if="mode!=='code'" class="diagram-toolbar-actions">
           <button type="button" class="iconbtn" aria-label="Diminuir zoom" title="Diminuir zoom" :disabled="!imageUrl" @click="zoom(1/1.2)"><ZoomOut :size="17"/></button>
           <span class="diagram-zoom">{{Math.round(scale*100)}}%</span>
           <button type="button" class="iconbtn" aria-label="Aumentar zoom" title="Aumentar zoom" :disabled="!imageUrl" @click="zoom(1.2)"><ZoomIn :size="17"/></button>
@@ -196,7 +206,7 @@ async function copyCode(){
           <button type="button" class="iconbtn" aria-label="Redesenhar diagrama" title="Redesenhar" @click="render"><RefreshCw :size="17"/></button>
         </div>
       </div>
-      <div ref="viewport" class="diagram-stage" tabindex="0" role="region" aria-label="Mapa interativo. Arraste para mover, use a roda para ampliar e as setas do teclado para navegar."
+      <div v-show="mode!=='code'" ref="viewport" class="diagram-stage" tabindex="0" role="region" aria-label="Mapa interativo. Arraste para mover, use a roda para ampliar e as setas do teclado para navegar."
         @wheel.prevent="wheel" @pointerdown="startDrag" @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag" @keydown="keyMove">
         <div v-if="imageUrl" class="diagram-transform" :style="{transform}">
           <img :src="imageUrl" :alt="diagramTitle+' com '+summary.tables.length+' tabelas e '+summary.edges.length+' ligações'" :width="dimensions.width" :height="dimensions.height" draggable="false"/>
@@ -204,23 +214,19 @@ async function copyCode(){
         <div v-if="loading" class="diagram-overlay" role="status">Desenhando diagrama...</div>
         <div v-else-if="error" class="diagram-overlay diagram-error" role="alert">{{error}}</div>
       </div>
+      <div v-if="mode==='code'" class="diagram-code-stage" role="region" aria-label="Código Mermaid do diagrama">
+        <pre><code>{{source}}</code></pre>
+      </div>
       <div class="diagram-board-footer">
-        <span>Arraste para navegar · Roda para zoom · Teclas +, −, 0 e setas</span>
-        <span>Renderização local com Mermaid</span>
+        <div class="diagram-footer-actions">
+          <button class="btn" type="button" @click="copyCode"><Copy :size="15"/> Copiar Mermaid</button>
+          <button class="btn" type="button" @click="exportMermaid"><Code2 :size="15"/> Baixar .mmd</button>
+          <button class="btn" type="button" :disabled="!imageUrl||loading" @click="exportSvg"><Download :size="15"/> SVG</button>
+          <button class="btn" type="button" :disabled="!imageUrl||loading" @click="exportPng"><Image :size="15"/> PNG</button>
+          <span v-if="message" role="status" class="diagram-message">{{message}}</span>
+        </div>
+        <span class="diagram-hint">{{mode==='code'?'Código gerado a partir do modelo atual':'Arraste para navegar · Roda para zoom · Teclas +, −, 0 e setas'}}</span>
       </div>
     </div>
-    <div class="diagram-export">
-      <button class="btn" type="button" @click="copyCode"><Copy :size="15"/> Copiar Mermaid</button>
-      <button class="btn" type="button" @click="exportMermaid"><Code2 :size="15"/> Baixar .mmd</button>
-      <button class="btn" type="button" :disabled="!imageUrl||loading" @click="exportSvg"><Download :size="15"/> SVG</button>
-      <button class="btn" type="button" :disabled="!imageUrl||loading" @click="exportPng"><Image :size="15"/> PNG</button>
-      <span v-if="message" role="status" class="diagram-message">{{message}}</span>
-    </div>
-    <details class="diagram-source">
-      <summary>Ver código Mermaid gerado automaticamente</summary>
-      <p>O código reflete o modelo atual. Copie ou baixe para editar no <a href="https://mermaidview.io/" target="_blank" rel="noopener noreferrer">MermaidView</a>. Alterações externas não modificam o projeto.</p>
-      <pre><code>{{source}}</code></pre>
-    </details>
-    <p class="diagram-footnote">O diagrama ER apresenta PK, FK, UNIQUE individual e nulidade. CHECKs, UNIQUEs compostos e triggers continuam disponíveis no editor e no JSON do projeto.</p>
   </section>
 </template>
