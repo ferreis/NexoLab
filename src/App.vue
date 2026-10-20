@@ -10,6 +10,7 @@ import CheckEditor from './components/CheckEditor.vue'
 import EnumValuesInput from './components/EnumValuesInput.vue'
 import SqlImportDialog from './components/SqlImportDialog.vue'
 import BulkEditDialog from './components/BulkEditDialog.vue'
+import DiagramViewer from './components/DiagramViewer.vue'
 import SqlFunctionManager from './components/SqlFunctionManager.vue'
 import SchemaObjectDialog from './components/SchemaObjectDialog.vue'
 import SchemaRulesDialog from './components/SchemaRulesDialog.vue'
@@ -40,10 +41,10 @@ function registerEditor(editors,id,instance){if(instance)editors.set(id,instance
 const leftOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null), schemaRulesDialog=ref(null), previewScroll=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const sidebarCategory=ref('tables')
-const sidebarCategories=computed(()=>[...schemaCategories(store.doc),{value:'preview',label:'Prévia',count:null}])
-const sidebarEntries=computed(()=>schemaEntries(store.doc,sidebarCategory.value==='preview'?'tables':sidebarCategory.value))
+const sidebarCategories=computed(()=>[...schemaCategories(store.doc),{value:'diagrams',label:'Diagramas',count:null},{value:'preview',label:'Prévia',count:null}])
+const sidebarEntries=computed(()=>schemaEntries(store.doc,['preview','diagrams'].includes(sidebarCategory.value)?'tables':sidebarCategory.value))
 function selectSidebarEntry(entry){
-  if(sidebarCategory.value==='tables'||sidebarCategory.value==='preview'){store.selectedId=entry.tableId;collapseSelectedTable();if(sidebarCategory.value==='preview')previewScope.value='table';return}
+  if(['tables','preview','diagrams'].includes(sidebarCategory.value)){store.selectedId=entry.tableId;collapseSelectedTable();if(sidebarCategory.value==='preview')previewScope.value='table';if(sidebarCategory.value==='diagrams')diagramScope.value='selected';return}
   if(sidebarCategory.value==='functions'){functionDialog.value?.open(entry.label);return}
   objectDialog.value?.open(sidebarCategory.value,entry)
 }
@@ -52,6 +53,7 @@ function addSidebarItem(){
   else if(sidebarCategory.value==='functions')functionDialog.value?.create()
 }
 const previewScope=ref('all')
+const diagramScope=ref('all')
 function scrollPreviewToEnd(){
   if(previewScroll.value)previewScroll.value.scrollTop=previewScroll.value.scrollHeight
 }
@@ -220,20 +222,26 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           <details v-for="(sql,i) in store.doc.comentariosSql" :key="'comment'+i"><summary>Comentário SQL {{i+1}}</summary><pre>{{sql}}</pre></details>
         </details>
 
+        <div v-if="sidebarCategory==='diagrams'" class="sidebar-preview-scope" role="group" aria-label="Escopo do diagrama">
+          <span class="sidebar-preview-caption">Visualizar</span>
+          <button type="button" :class="{active:diagramScope==='all'}" :aria-pressed="diagramScope==='all'" @click="diagramScope='all'"><Network :size="15"/> Todas as tabelas</button>
+          <button type="button" :class="{active:diagramScope==='selected'}" :aria-pressed="diagramScope==='selected'" :disabled="!store.selected" @click="diagramScope='selected'"><Database :size="15"/> Tabela e ligações</button>
+          <span class="sidebar-preview-caption">Escolher tabela</span>
+        </div>
         <div v-if="sidebarCategory==='preview'" class="sidebar-preview-scope" role="group" aria-label="Escopo da prévia">
           <span class="sidebar-preview-caption">Visualizar</span>
           <button type="button" :class="{active:previewScope==='all'}" :aria-pressed="previewScope==='all'" @click="previewScope='all'"><FileJson :size="15"/> Esquema completo</button>
           <button type="button" :class="{active:previewScope==='table'}" :aria-pressed="previewScope==='table'" :disabled="!store.selected" @click="previewScope='table'"><Database :size="15"/> Tabela selecionada</button>
           <span class="sidebar-preview-caption">Escolher tabela</span>
         </div>
-        <nav :key="sidebarCategory" class="tablelist" :aria-label="sidebarCategory==='preview'?'Tabelas para prévia':'Lista de '+sidebarCategories.find(c=>c.value===sidebarCategory)?.label">
-          <button v-for="entry in sidebarEntries" :key="entry.key" class="tablebtn" :title="entry.tableName?entry.label+' · '+entry.tableName:entry.label"  :class="{active:(sidebarCategory==='tables'||(sidebarCategory==='preview'&&previewScope==='table'))&&store.selectedId===entry.tableId}" @click="selectSidebarEntry(entry)">
-            <Database v-if="sidebarCategory==='tables'||sidebarCategory==='preview'" :size="15"/>
+        <nav :key="sidebarCategory" class="tablelist" :aria-label="sidebarCategory==='preview'?'Tabelas para prévia':sidebarCategory==='diagrams'?'Tabelas para diagrama':'Lista de '+sidebarCategories.find(c=>c.value===sidebarCategory)?.label">
+          <button v-for="entry in sidebarEntries" :key="entry.key" class="tablebtn" :title="entry.tableName?entry.label+' · '+entry.tableName:entry.label"  :class="{active:(sidebarCategory==='tables'||(sidebarCategory==='preview'&&previewScope==='table')||(sidebarCategory==='diagrams'&&diagramScope==='selected'))&&store.selectedId===entry.tableId}" @click="selectSidebarEntry(entry)">
+            <Database v-if="['tables','preview','diagrams'].includes(sidebarCategory)" :size="15"/>
             <List v-else-if="sidebarCategory==='enums'" :size="15"/>
             <Workflow v-else-if="sidebarCategory==='triggers'" :size="15"/>
             <Code2 v-else :size="15"/>
             <span>{{entry.label}}</span>
-            <small v-if="sidebarCategory==='tables'||sidebarCategory==='enums'||sidebarCategory==='preview'">{{entry.count}}</small>
+            <small v-if="['tables','enums','preview','diagrams'].includes(sidebarCategory)">{{entry.count}}</small>
             <small v-else-if="sidebarCategory==='triggers'" class="sidebar-table-tag">{{entry.tableName}}</small>
           </button>
           <p v-if="!sidebarEntries.length" class="sidebar-empty">Nenhum item nesta categoria.</p>
@@ -245,12 +253,12 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div v-else-if="sidebarCategory==='functions'" class="table-side-actions">
           <button class="btn primary full" @click="functionDialog?.create()"><Plus :size="16"/> Nova função SQL</button>
         </div>
-        <div v-else-if="sidebarCategory==='preview'" class="table-side-actions">
+        <div v-else-if="sidebarCategory==='preview'||sidebarCategory==='diagrams'" class="table-side-actions">
           <button class="btn full" @click="sidebarCategory='tables'"><Database :size="16"/> Voltar às tabelas</button>
         </div>
       </template>
     </aside>
-    <main class="editor panel" :class="{'preview-editor':sidebarCategory==='preview'}">
+    <main class="editor panel" :class="{'preview-editor':sidebarCategory==='preview','diagram-editor':sidebarCategory==='diagrams'}">
       <p v-if="store.nameError" class="name-error" role="alert">{{store.nameError}} Corrija os nomes para exportar ou copiar o modelo.</p>
       <section v-if="sidebarCategory==='preview'" class="preview-page" aria-label="Prévia do modelo">
         <div class="sectionhead preview-page-heading">
@@ -287,6 +295,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           </div>
         </div>
       </section>
+      <DiagramViewer v-else-if="sidebarCategory==='diagrams'" :model="store.doc" :selected-id="store.selectedId" :scope="diagramScope"/>
       <template v-else-if="store.selected">
         <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button></div>
         <div class="formgrid">
