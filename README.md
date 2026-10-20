@@ -23,6 +23,17 @@ Cada coluna também possui um campo **Comentário**, separado de **Regra**. O JS
 
 A opção **Prévia**, no seletor do menu lateral esquerdo, abre uma página central dedicada a TXT/JSON. A opção **Tabela** mostra somente a tabela selecionada, suas colunas e seus relacionamentos e CHECKs; objetos globais do schema (ENUMs, funções e comentários gerais) aparecem apenas em **Esquema completo**.
 
+## Diagramas Mermaid: mapa de ligações e diagrama ER
+
+No seletor do menu lateral, escolha **Diagramas**. O visualizador usa o modelo local para gerar dois tipos de diagrama Mermaid, atualizados automaticamente conforme as tabelas são editadas:
+
+- **Ligações**: mapa de dependências das FKs (setas da tabela que contém a FK para a tabela referenciada), incluindo tabelas sem relações e aviso para referências externas ausentes.
+- **Banco ER**: entidades com suas colunas, tipos, PK, FK, UNIQUE individual, indicação de NULL/NOT NULL e relacionamentos com cardinalidade aproximada a partir das FKs. CHECKs, UNIQUEs compostos e triggers permanecem documentados no editor e no JSON, pois não cabem integralmente na notação ER.
+
+Escolha **Todas as tabelas** ou **Tabela e ligações** para destacar a tabela selecionada e suas vizinhas. Também é possível mudar a direção horizontal/vertical, alternar tema claro/escuro, ampliar com a roda do mouse, arrastar o canvas e ajustar à tela. Os botões permitem **copiar o código Mermaid**, baixar `.mmd`, **SVG** e **PNG**. A seção de código pode ser aberta para copiar e editar no MermaidView.
+
+A renderização usa a dependência Mermaid instalada localmente e o nível de segurança `strict`. O SVG é exibido como imagem em vez de HTML ativo. Nenhum esquema é enviado a um serviço externo, e o visualizador não modifica o banco nem executa SQL.
+
 ## Edição em massa e refatoração de FKs
 
 O botão **Edição em massa** fica no cabeçalho do modelador. Pesquise por tabela ou nome de coluna, marque os resultados individualmente ou use **Selecionar resultados**, e escolha uma alteração: **substituir trecho no nome**, **alterar tipo de dado**, **Permite NULL**, **Imutável** ou **Valor padrão**. A renomeação mostra o valor anterior e o novo nome antes da confirmação. Operações que gerariam nomes duplicados são recusadas sem alterar o documento.
@@ -58,6 +69,7 @@ Tipos não representados no seletor visual são registrados como **CUSTOM**, man
 - Ajuda contextual para os tipos de dados.
 - Menu lateral esquerdo recolhível com seletor personalizado e navegação por Tabelas, Enum, Triggers, Functions e Prévia.
 - Prévia TXT/JSON em tela central, com alternância entre esquema completo e tabela selecionada, cópia fiel e rolagem própria.
+- Diagramas Mermaid de ligações FK e banco ER, com canvas navegável, escopo por tabela e exportação de código, SVG e PNG.
 - Reordenação das colunas pela alça de arrastar ou pelas setas do teclado, mantendo ID e datas fixos; ordem preservada ao salvar e exportar.
 - Exportação TXT/JSON e importação do JSON da ferramenta HTML anterior.
 - Persistência automática local via `localStorage`.
