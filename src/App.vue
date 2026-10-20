@@ -19,7 +19,7 @@ import { schemaCategories, schemaEntries } from './schemaNavigation.js'
 import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
 import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
-import { Database, PanelLeftClose, PanelLeftOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, FilePenLine, ArrowDownToLine } from 'lucide-vue-next'
+import { Database, PanelLeftClose, PanelLeftOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, Network, FilePenLine, ArrowDownToLine } from 'lucide-vue-next'
 const store=useModelStore()
 const topbar=ref(null)
 const headerHeight=ref(76)
