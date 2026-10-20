@@ -166,7 +166,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
 </script>
 
 <template>
-<div class="app">
+<div class="app" :class="{'preview-closed':!rightOpen}">
   <header class="topbar">
     <div class="brand"><Database :size="23"/><div><strong>NexoDB Lab</strong><small>Projetos PostgreSQL e Supabase, sem alterar o banco</small></div></div>
     <div class="top-actions">
