@@ -167,7 +167,6 @@ async function copyCode(){
 
 <template>
   <section class="diagram-page" aria-label="Diagramas do modelo">
-    <p v-if="summary.unresolved.length" class="diagram-warning">FKs sem tabela correspondente no modelo: {{summary.unresolved.join(', ')}}. Elas aparecem como referências externas.</p>
     <div class="diagram-board">
       <div class="diagram-toolbar">
         <div class="diagram-toolbar-main">

@@ -442,9 +442,13 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 }
 
 
-/* Diagramas Mermaid: visualizações gráfica e de código, com ações na própria moldura. */
-.diagram-editor { display:flex; flex-direction:column; height:calc(100dvh - var(--header-height)); min-height:580px; overflow-y:auto; }
-.diagram-page { display:flex; flex-direction:column; flex:1 0 auto; min-height:0; min-width:0; }
+/* Diagramas Mermaid: ocupar a região inteira entre o cabeçalho e a navegação. */
+html:has(.app.diagram-active), body:has(.app.diagram-active) { height:100%; overflow:hidden; }
+.app.diagram-active { height:100dvh; min-height:0; overflow:hidden; }
+.app.diagram-active .workspace { height:calc(100dvh - var(--header-height)); min-height:0; overflow:hidden; }
+.app.diagram-active .sidebar { min-height:0; overflow-y:auto; }
+.diagram-editor { display:flex; flex-direction:column; height:100%; min-height:0; padding:0; overflow:hidden; }
+.diagram-page { display:flex; flex-direction:column; flex:1 1 auto; height:100%; min-height:0; min-width:0; }
 .diagram-counts { font-size:11px; color:#b7c7de; background:#1c2637; border:1px solid #3a4660; border-radius:6px; padding:5px 7px; white-space:nowrap; }
 .diagram-controls { display:flex; flex:1 1 520px; min-width:0; flex-wrap:wrap; gap:8px 12px; align-items:flex-end; }
 .diagram-control-set { display:grid; gap:5px; min-width:0; }
@@ -454,8 +458,7 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 .diagram-control-set .tabs button:hover { background:#2b3850; }
 .diagram-control-set .tabs button.active { color:#f1eaff; background:#493771; }
 .diagram-control-set .tabs button:focus-visible { outline:2px solid #b9a5ff; outline-offset:1px; }
-.diagram-warning { margin:0 0 12px; padding:10px 12px; border:1px solid #7c6540; border-radius:7px; background:#342a20; color:#ffdeb3; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
-.diagram-board { display:flex; flex-direction:column; flex:1 1 auto; min-height:340px; min-width:0; border:1px solid #3b4a64; border-radius:10px; overflow:hidden; background:#101827; }
+.diagram-board { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; min-width:0; border:0; border-radius:0; overflow:hidden; background:#101827; }
 .diagram-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; padding:10px 12px; border-bottom:1px solid #334158; background:#1b2433; }
 .diagram-toolbar-main { display:flex; flex-direction:column; align-items:flex-start; gap:6px; flex:0 0 auto; }
 .diagram-toolbar-main strong { font-size:12px; color:#e1e7f2; }
@@ -463,14 +466,14 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 .diagram-toolbar-actions .iconbtn { min-width:30px; min-height:30px; }
 .diagram-toolbar-actions .iconbtn:disabled { opacity:.4; cursor:not-allowed; }
 .diagram-zoom { min-width:42px; text-align:center; font:11px ui-monospace,monospace; color:#b9c8db; }
-.diagram-stage { position:relative; flex:1 1 auto; min-height:220px; min-width:0; overflow:hidden; cursor:grab; touch-action:none; user-select:none; background-color:#101827; background-image:radial-gradient(#34435b 1px,transparent 1px); background-size:22px 22px; }
+.diagram-stage { position:relative; flex:1 1 auto; min-height:0; min-width:0; overflow:hidden; cursor:grab; touch-action:none; user-select:none; background-color:#101827; background-image:radial-gradient(#34435b 1px,transparent 1px); background-size:22px 22px; }
 .diagram-stage:active { cursor:grabbing; }
 .diagram-stage:focus-visible { outline:2px solid #b49aff; outline-offset:-2px; }
 .diagram-transform { position:absolute; top:0; left:0; transform-origin:0 0; pointer-events:none; }
 .diagram-transform img { display:block; max-width:none; max-height:none; pointer-events:none; }
 .diagram-overlay { position:absolute; inset:0; display:grid; place-items:center; padding:22px; background:#101827d9; color:#d8cafa; font-size:13px; text-align:center; line-height:1.5; }
 .diagram-error { color:#ffb3bb; }
-.diagram-code-stage { flex:1 1 auto; min-height:220px; min-width:0; max-width:100%; overflow:auto; background:#0e1624; }
+.diagram-code-stage { flex:1 1 auto; min-height:0; min-width:0; max-width:100%; overflow:auto; background:#0e1624; }
 .diagram-code-stage pre { box-sizing:border-box; width:max-content; min-width:100%; margin:0; padding:18px; white-space:pre; color:#e3ebf9; font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace; tab-size:2; }
 .diagram-board-footer { display:flex; align-items:center; justify-content:space-between; gap:8px 16px; flex-wrap:wrap; padding:9px 12px; border-top:1px solid #334158; background:#182234; color:#9aaac0; font-size:10px; }
 .diagram-footer-actions { display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0; }
@@ -479,7 +482,13 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 .diagram-hint { color:#9aaac0; line-height:1.5; }
 .diagram-message { color:#c8baff; font-size:11px; }
 @media(max-width:767px){
-  .diagram-editor { height:calc(100dvh - var(--header-height) - 80px); min-height:630px; }
+  /* No celular, o menu lateral permanece acima do diagrama e a página pode rolar. */
+  html:has(.app.diagram-active), body:has(.app.diagram-active) { height:auto; overflow:visible; }
+  .app.diagram-active { height:auto; min-height:100vh; overflow:visible; }
+  .app.diagram-active .workspace { height:auto; min-height:calc(100dvh - var(--header-height)); overflow:visible; }
+  .app.diagram-active .sidebar { overflow:visible; }
+  .diagram-editor { height:max(540px, calc(100dvh - var(--header-height))); min-height:0; }
+  .diagram-stage, .diagram-code-stage { min-height:180px; }
   .diagram-counts { white-space:normal; }
   .diagram-controls { flex:1 1 100%; gap:8px; }
   .diagram-control-set .tabs button { white-space:normal; }

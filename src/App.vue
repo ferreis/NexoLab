@@ -182,7 +182,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
 </script>
 
 <template>
-<div class="app" :style="{'--header-height':headerHeight+'px'}">
+<div class="app" :class="{'diagram-active':sidebarCategory==='diagrams'}" :style="{'--header-height':headerHeight+'px'}">
   <header ref="topbar" class="topbar">
     <div class="brand"><Database :size="23"/><strong>NexoDB Lab</strong></div>
     <div class="top-actions">
