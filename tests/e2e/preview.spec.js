@@ -51,8 +51,9 @@ test('painel direito permanece inteiro ao rolar a página e permite chegar ao fi
   expect(bounds).not.toBeNull()
   expect(bounds.y).toBeGreaterThanOrEqual(-1)
   expect(bounds.y).toBeLessThanOrEqual(1)
-  expect(Math.abs(bounds.height-900)).toBeLessThanOrEqual(1)
-  expect(Math.abs(bounds.y+bounds.height-900)).toBeLessThanOrEqual(1)
+  const viewportHeight=page.viewportSize().height
+  expect(Math.abs(bounds.height-viewportHeight)).toBeLessThanOrEqual(1)
+  expect(Math.abs(bounds.y+bounds.height-viewportHeight)).toBeLessThanOrEqual(1)
 
   await page.getByRole('button',{name:'Ir ao final da prévia'}).click()
   await expect(page.locator('.preview-end-marker')).toBeInViewport()
