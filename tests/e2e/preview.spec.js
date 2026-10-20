@@ -372,6 +372,6 @@ test('código Mermaid tem rolagem interna em telas estreitas, sem ampliar largur
     })
     expect(size.documentWidth).toBeLessThanOrEqual(size.viewportWidth)
     expect(size.stageWidth).toBeGreaterThan(150)
-    expect(size.scrollWidth).toBeGreaterThanOrEqual(size.stageWidth)
+    expect(size.scrollWidth).toBeGreaterThanOrEqual(Math.floor(size.stageWidth))
   }
 })
