@@ -109,6 +109,7 @@ Na prévia **Tabela**, TXT e JSON mostram apenas informações próprias da tabe
 ```bash
 npm test
 npm run build
+npm audit --omit=dev --audit-level=high
 ```
 
 ### Testes de interface com Playwright
