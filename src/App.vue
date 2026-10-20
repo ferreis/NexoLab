@@ -184,7 +184,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
 <template>
 <div class="app" :style="{'--header-height':headerHeight+'px'}">
   <header ref="topbar" class="topbar">
-    <div class="brand"><Database :size="23"/><div><strong>NexoDB Lab</strong><small>Projetos PostgreSQL e Supabase, sem alterar o banco</small></div></div>
+    <div class="brand"><Database :size="23"/><strong>NexoDB Lab</strong></div>
     <div class="top-actions">
       <button class="btn ghost" @click="fileInput?.click()"><Upload :size="15"/> Importar JSON</button>
       <button class="btn ghost" @click="sqlDialog?.open()"><Upload :size="15"/> Importar SQL</button>
