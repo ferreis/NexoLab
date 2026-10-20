@@ -52,6 +52,7 @@ Tipos não representados no seletor visual são registrados como **CUSTOM**, man
 ## Funcionalidades
 
 - Editor de tabelas e colunas; inserção de ID e datas padrão sem duplicação.
+- Botão **Duplicar coluna** ao lado de **Excluir coluna** em cada cartão: cria uma cópia com nome exclusivo (`nome_copia`, `nome_copia_2`), aberta para edição, preservando tipo, tamanho, regras, comentários, FKs e CHECKs. A cópia tem novo identificador e novos IDs de CHECK; PK, identidade automática, vínculos de UNIQUE composto e nomes de constraints SQL importadas não são replicados para evitar conflitos.
 - Valor padrão na criação, opção de coluna imutável e regras em texto livre, incluídos nas propostas TXT/JSON.
 - Suporte a ENUM, VARCHAR, NUMERIC, tipos comuns do PostgreSQL, PK, FK, NULL e UNIQUE.
 - Ajuda contextual para os tipos de dados.

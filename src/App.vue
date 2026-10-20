@@ -163,6 +163,16 @@ async function confirmDelete(){
 }
 function help(t){helpType.value=helpType.value===t?'':t}
 function removeColumn(id){if(store.removeColumn(id))toast('Coluna excluída. As composições UNIQUE e os CHECKs do construtor que dependiam dela também foram removidos.')}
+function duplicateColumn(id){
+  try{
+    const copy=store.duplicateColumn(id)
+    if(!copy)return
+    const next=new Set(collapsed.value)
+    next.delete(copy.uid)
+    collapsed.value=next
+    toast(`Coluna “${copy.nome}” duplicada. Revise o nome e as restrições.`)
+  }catch(error){toast('Não foi possível duplicar: '+error.message)}
+}
 function toggleCard(id){const next=new Set(collapsed.value);next.has(id)?next.delete(id):next.add(id);collapsed.value=next}
 function setType(c,v){c.tipo=v;if(!showSize(v)){c.tamanho='';c.escala=''}if(v!=='ENUM')c.enumValores=[];if(!fks.includes(v)){c.fk=false;c.fkTabela=''}}
 const typeInfo=t=>TYPES.find(x=>x[0]===t)?.[1]||''
@@ -295,7 +305,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         <div v-if="!store.selected.colunas.length" class="empty">Nenhuma coluna cadastrada. Use <strong>ID e datas padrão</strong> ou adicione uma coluna.</div>
         <p id="reorder-help" class="sr-only">Arraste pela alça para reordenar, ou use as setas para cima e para baixo com a alça em foco. ID e datas permanecem fixos.</p>
         <article v-for="c in store.columns" :key="c.uid" class="columncard" :class="{dragging:dragged?.id===c.uid,'drop-before':dropTarget?.id===c.uid&&!dropTarget.after,'drop-after':dropTarget?.id===c.uid&&dropTarget.after}" @dragover="dragOver($event,c)" @drop="dropColumn($event,c)">
-          <div class="columnhead"><button v-if="!isDefaultColumn(c)" class="drag-handle" draggable="true" :aria-label="`Reordenar coluna ${c.nome||'sem nome'}`" aria-describedby="reorder-help" title="Arrastar para reordenar · ↑ ↓ pelo teclado" @dragstart="startDrag($event,c)" @dragend="endDrag" @keydown="moveWithKeyboard($event,c)"><GripVertical :size="17"/></button><button class="cardtoggle" :aria-expanded="!collapsed.has(c.uid)" @click="toggleCard(c.uid)"><ChevronDown v-if="!collapsed.has(c.uid)" :size="16"/><ChevronUp v-else :size="16"/><strong>{{c.nome||'Nova coluna'}}</strong> <small>{{c.tipo}}</small><ColumnBadges :column="c" :table="store.selected"/></button><button class="iconbtn danger" title="Excluir coluna" @click="removeColumn(c.uid)"><Trash2 :size="16"/></button></div>
+          <div class="columnhead"><button v-if="!isDefaultColumn(c)" class="drag-handle" draggable="true" :aria-label="`Reordenar coluna ${c.nome||'sem nome'}`" aria-describedby="reorder-help" title="Arrastar para reordenar · ↑ ↓ pelo teclado" @dragstart="startDrag($event,c)" @dragend="endDrag" @keydown="moveWithKeyboard($event,c)"><GripVertical :size="17"/></button><button class="cardtoggle" :aria-expanded="!collapsed.has(c.uid)" @click="toggleCard(c.uid)"><ChevronDown v-if="!collapsed.has(c.uid)" :size="16"/><ChevronUp v-else :size="16"/><strong>{{c.nome||'Nova coluna'}}</strong> <small>{{c.tipo}}</small><ColumnBadges :column="c" :table="store.selected"/></button><div class="column-actions"><button type="button" class="iconbtn duplicate" title="Duplicar coluna" :aria-label="`Duplicar coluna ${c.nome||'sem nome'}`" @click="duplicateColumn(c.uid)"><Copy :size="16"/></button><button type="button" class="iconbtn danger" title="Excluir coluna" :aria-label="`Excluir coluna ${c.nome||'sem nome'}`" @click="removeColumn(c.uid)"><Trash2 :size="16"/></button></div></div>
           <div v-if="!collapsed.has(c.uid)" class="columnbody">
             <div class="fields3" :class="{fields2:!showSize(c.tipo)}">
               <label>Nome<NameInput label="Nome" :model-value="c.nome" :commit="name=>store.renameColumn(c,name)"/></label>
