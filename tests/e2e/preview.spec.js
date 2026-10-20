@@ -284,6 +284,9 @@ test('diagrama ER exibe campos PK/FK, aceita seleção de tabela e exporta SVG',
   expect((await download).suggestedFilename()).toBe('nexodb-banco-er.svg')
   const pngDownload=page.waitForEvent('download')
   await page.getByRole('button',{name:'PNG',exact:true}).click()
+  await page.waitForTimeout(500)
+  const pngError=await page.locator('.diagram-message').allTextContents()
+  if(pngError.some(message=>message.includes('Não foi possível gerar o PNG')))throw new Error(pngError.join('; '))
   expect((await pngDownload).suggestedFilename()).toBe('nexodb-banco-er.png')
 })
 test('diagramas preservam layout sem rolagem horizontal em desktop e celular',async({page})=>{
