@@ -34,18 +34,19 @@ test.beforeEach(async({page})=>{
   await expect(page.getByRole('heading',{name:'Estrutura da tabela'})).toBeVisible()
 })
 
-test('menu lateral estilizado oferece Tabelas, Enum, Triggers, Functions e Prévia',async({page})=>{
+test('menu lateral estilizado oferece Tabelas, Enum, Triggers, Functions, Diagramas e Prévia',async({page})=>{
   const trigger=page.getByRole('button',{name:'Selecionar categoria do menu lateral'})
   await expect(trigger).toHaveAttribute('aria-expanded','false')
   await trigger.click()
   await expect(trigger).toHaveAttribute('aria-expanded','true')
   const options=page.getByRole('listbox',{name:'Categorias do menu lateral'}).getByRole('option')
-  await expect(options).toHaveCount(5)
+  await expect(options).toHaveCount(6)
   await expect(options.nth(0)).toContainText('Tabelas')
   await expect(options.nth(1)).toContainText('Enum')
   await expect(options.nth(2)).toContainText('Triggers')
   await expect(options.nth(3)).toContainText('Functions')
-  await expect(options.nth(4)).toContainText('Prévia')
+  await expect(options.nth(4)).toContainText('Diagramas')
+  await expect(options.nth(5)).toContainText('Prévia')
   await page.getByRole('option',{name:'Prévia'}).click()
   await expect(trigger).toHaveAttribute('aria-expanded','false')
   await expect(page.getByRole('heading',{name:'Prévia do modelo'})).toBeVisible()
@@ -214,4 +215,95 @@ test('duplicar coluna id preserva PK original e não marca PK na cópia',async({
   await expect(copy.locator('.columnbadge').filter({hasText:'PK'})).toHaveCount(0)
   await expect(copy.locator('.columnbadge').filter({hasText:'UNIQUE'})).toHaveCount(0)
   await expect(page.locator('.columncard .columnbadge').filter({hasText:'PK'})).toHaveCount(1)
+})
+
+
+const diagramSample={
+  schema_alvo:'public',
+  tabelas:[
+    {nome:'clientes',colunas:[
+      {nome:'id',tipo:'BIGINT',pk:true},
+      {nome:'nome',tipo:'TEXT',nullable:false}
+    ]},
+    {nome:'pedidos',colunas:[
+      {nome:'id',tipo:'BIGINT',pk:true},
+      {nome:'cliente_id',tipo:'BIGINT',fk:true,fkTabela:'clientes',fkColuna:'id',nullable:false},
+      {nome:'responsavel_id',tipo:'BIGINT',fk:true,fkTabela:'externa',fkColuna:'id',nullable:true}
+    ]},
+    {nome:'categorias',colunas:[{nome:'titulo',tipo:'TEXT'}]}
+  ]
+}
+async function openDiagrams(page){
+  await page.evaluate(data=>localStorage.setItem('modelador-rpg-vue-v2',JSON.stringify(data)),diagramSample)
+  await page.reload()
+  await page.getByRole('button',{name:'Selecionar categoria do menu lateral'}).click()
+  await page.getByRole('option',{name:'Diagramas'}).click()
+  await expect(page.getByRole('heading',{name:'Diagramas Mermaid'})).toBeVisible()
+}
+test('visualiza mapa Mermaid de FKs, permite zoom e copia código sem sair do app',async({page,context})=>{
+  await openDiagrams(page)
+  const stage=page.getByRole('region',{name:/Mapa interativo/})
+  const img=stage.locator('img')
+  await expect(img).toHaveAttribute('src',/^blob:/,{timeout:30000})
+  await expect.poll(()=>img.evaluate(el=>el.complete&&el.naturalWidth>0),{timeout:30000}).toBe(true)
+  await expect(page.locator('.diagram-counts')).toContainText('3 tabela(s) · 2 ligação(ões)')
+  await expect(page.locator('.diagram-warning')).toContainText('externa')
+  await page.locator('.diagram-source summary').click()
+  const code=page.locator('.diagram-source code')
+  await expect(code).toContainText('flowchart LR')
+  await expect(code).toContainText('cliente_id → id')
+  await expect(code).toContainText('não encontrada')
+  const before=await page.locator('.diagram-zoom').textContent()
+  await page.getByRole('button',{name:'Aumentar zoom'}).click()
+  await expect(page.locator('.diagram-zoom')).not.toHaveText(before)
+  await page.getByRole('button',{name:'Ajustar diagrama à tela'}).click()
+  await context.grantPermissions(['clipboard-read','clipboard-write'])
+  await page.getByRole('button',{name:'Copiar Mermaid'}).click()
+  expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(await code.textContent())
+  const download=page.waitForEvent('download')
+  await page.getByRole('button',{name:'Baixar .mmd'}).click()
+  expect((await download).suggestedFilename()).toBe('nexodb-ligacoes.mmd')
+})
+test('diagrama ER exibe campos PK/FK, aceita seleção de tabela e exporta SVG',async({page})=>{
+  await openDiagrams(page)
+  await page.getByRole('group',{name:'Tipo de diagrama'}).getByRole('button',{name:'Banco ER'}).click()
+  await page.locator('.diagram-source summary').click()
+  const code=page.locator('.diagram-source code')
+  await expect(code).toContainText('erDiagram')
+  await expect(code).toContainText('BIGINT cliente_id FK')
+  await expect(code).toContainText('BIGINT id PK')
+  await page.getByRole('group',{name:'Direção do diagrama'}).getByRole('button',{name:'Vertical'}).click()
+  await expect(code).toContainText('direction TB')
+  await page.getByRole('navigation',{name:'Tabelas para diagrama'}).getByRole('button',{name:/pedidos/}).click()
+  await expect(page.getByRole('group',{name:'Escopo do diagrama'}).getByRole('button',{name:'Tabela e ligações'})).toHaveAttribute('aria-pressed','true')
+  await expect(code).not.toContainText('categorias')
+  await expect(code).toContainText('clientes')
+  await expect.poll(()=>page.locator('.diagram-stage img').evaluate(el=>el.complete&&el.naturalWidth>0),{timeout:30000}).toBe(true)
+  const download=page.waitForEvent('download')
+  await page.getByRole('button',{name:'SVG',exact:true}).click()
+  expect((await download).suggestedFilename()).toBe('nexodb-banco-er.svg')
+  const pngDownload=page.waitForEvent('download')
+  await page.getByRole('button',{name:'PNG',exact:true}).click()
+  await page.waitForTimeout(500)
+  const pngError=await page.locator('.diagram-message').allTextContents()
+  if(pngError.some(message=>message.includes('Não foi possível gerar o PNG')))throw new Error(pngError.join('; '))
+  expect((await pngDownload).suggestedFilename()).toBe('nexodb-banco-er.png')
+})
+test('diagramas preservam layout sem rolagem horizontal em desktop e celular',async({page})=>{
+  await openDiagrams(page)
+  const image=page.locator('.diagram-stage img')
+  await expect(image).toBeVisible({timeout:30000})
+  await expect.poll(()=>image.evaluate(el=>el.complete&&el.naturalWidth>0),{timeout:30000}).toBe(true)
+  for(const width of [1440,767,390]){
+    await page.setViewportSize({width,height:900})
+    const size=await page.evaluate(()=>({
+      documentWidth:document.documentElement.scrollWidth,
+      viewportWidth:innerWidth,
+      stageWidth:document.querySelector('.diagram-stage').getBoundingClientRect().width,
+      imgCount:document.querySelectorAll('.diagram-stage img').length
+    }))
+    expect(size.documentWidth).toBeLessThanOrEqual(size.viewportWidth)
+    expect(size.stageWidth).toBeGreaterThan(150)
+    expect(size.imgCount).toBe(1)
+  }
 })
