@@ -443,6 +443,7 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 
 
 /* Diagramas Mermaid: ocupar a região inteira entre o cabeçalho e a navegação. */
+html:has(.app.diagram-active), body:has(.app.diagram-active) { height:100%; overflow:hidden; }
 .app.diagram-active { height:100dvh; min-height:0; overflow:hidden; }
 .app.diagram-active .workspace { height:calc(100dvh - var(--header-height)); min-height:0; overflow:hidden; }
 .app.diagram-active .sidebar { min-height:0; overflow-y:auto; }
@@ -482,6 +483,7 @@ input:hover, textarea:hover, select:hover { border-color: #536480; }
 .diagram-message { color:#c8baff; font-size:11px; }
 @media(max-width:767px){
   /* No celular, o menu lateral permanece acima do diagrama e a página pode rolar. */
+  html:has(.app.diagram-active), body:has(.app.diagram-active) { height:auto; overflow:visible; }
   .app.diagram-active { height:auto; min-height:100vh; overflow:visible; }
   .app.diagram-active .workspace { height:auto; min-height:calc(100dvh - var(--header-height)); overflow:visible; }
   .app.diagram-active .sidebar { overflow:visible; }
