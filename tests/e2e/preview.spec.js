@@ -49,10 +49,10 @@ test('painel direito permanece inteiro ao rolar a página e permite chegar ao fi
   const panel=page.locator('aside.preview')
   const bounds=await panel.boundingBox()
   expect(bounds).not.toBeNull()
-  expect(bounds.y).toBeGreaterThanOrEqual(-1)
-  expect(bounds.y).toBeLessThanOrEqual(1)
+  const headerHeight=await page.locator('header.topbar').evaluate(el=>el.getBoundingClientRect().height)
   const viewportHeight=page.viewportSize().height
-  expect(Math.abs(bounds.height-viewportHeight)).toBeLessThanOrEqual(1)
+  expect(Math.abs(bounds.y-headerHeight)).toBeLessThanOrEqual(1)
+  expect(Math.abs(bounds.height-(viewportHeight-headerHeight))).toBeLessThanOrEqual(1)
   expect(Math.abs(bounds.y+bounds.height-viewportHeight)).toBeLessThanOrEqual(1)
 
   await page.getByRole('button',{name:'Ir ao final da prévia'}).click()
@@ -95,19 +95,19 @@ test('painel fixo permanece completo no fim da página em tela larga',async({pag
       position:getComputedStyle(document.querySelector('aside.preview')).position,
       top:panel.top,bottom:panel.bottom,right:panel.right,width:panel.width,
       contentBottom:content.bottom,scrollBottom:scroll.bottom,
-      editorRight:editor.right,headerRight:header.right,
+      editorRight:editor.right,headerRight:header.right,headerHeight:header.height,
       viewportHeight:innerHeight,viewportWidth:innerWidth
     }
   })
   expect(metrics.position).toBe('fixed')
-  expect(metrics.top).toBeCloseTo(0,0)
+  expect(metrics.top).toBeCloseTo(metrics.headerHeight,0)
   expect(metrics.bottom).toBeCloseTo(metrics.viewportHeight,0)
   expect(metrics.right).toBeCloseTo(metrics.viewportWidth,0)
   expect(metrics.width).toBe(380)
   expect(metrics.contentBottom).toBeGreaterThan(metrics.viewportHeight-35)
   expect(metrics.scrollBottom).toBeGreaterThan(metrics.viewportHeight-35)
   expect(metrics.editorRight).toBeLessThanOrEqual(metrics.viewportWidth-metrics.width+1)
-  expect(metrics.headerRight).toBeLessThanOrEqual(metrics.viewportWidth-metrics.width+1)
+  expect(metrics.headerRight).toBeCloseTo(metrics.viewportWidth,0)
 
   const oldScroll=await page.evaluate(()=>window.scrollY)
   await page.getByRole('button',{name:'Ir ao final da prévia'}).click()
@@ -123,6 +123,7 @@ test('recolher e expandir prévia mantém largura reservada sem sobrepor o edito
       panelWidth:box('aside.preview').width,
       panelTop:box('aside.preview').top,
       panelBottom:box('aside.preview').bottom,
+      headerHeight:box('header.topbar').height,
       editorRight:box('main.editor').right,
       headerRight:box('header.topbar').right,
       windowWidth:innerWidth
@@ -134,9 +135,9 @@ test('recolher e expandir prévia mantém largura reservada sem sobrepor o edito
   const collapsed=await measure()
   expect(collapsed.panelWidth).toBe(48)
   expect(collapsed.editorRight).toBeGreaterThan(expanded.editorRight)
-  expect(collapsed.headerRight).toBeGreaterThan(expanded.headerRight)
+  expect(collapsed.headerRight).toBeCloseTo(expanded.headerRight,0)
   expect(collapsed.editorRight).toBeLessThanOrEqual(collapsed.windowWidth-48+1)
-  expect(collapsed.panelTop).toBe(0)
+  expect(collapsed.panelTop).toBeCloseTo(collapsed.headerHeight,0)
   expect(collapsed.panelBottom).toBe(896)
 
   await page.getByRole('button',{name:'Expandir prévia'}).click()
@@ -144,6 +145,7 @@ test('recolher e expandir prévia mantém largura reservada sem sobrepor o edito
   expect(reopened.panelWidth).toBe(380)
   expect(reopened.editorRight).toBeCloseTo(expanded.editorRight,0)
   expect(reopened.headerRight).toBeCloseTo(expanded.headerRight,0)
+  expect(reopened.panelTop).toBeCloseTo(reopened.headerHeight,0)
 })
 
 test('em telas menores o painel volta ao fluxo e não cobre o cabeçalho',async({page})=>{
@@ -175,4 +177,35 @@ test('em telas menores o painel volta ao fluxo e não cobre o cabeçalho',async(
   expect(metrics.headerRight).toBeCloseTo(390,0)
   expect(metrics.panelWidth).toBeCloseTo(390,0)
   expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth)
+})
+
+test('altura dinâmica do cabeçalho mantém painel alinhado à barra esquerda',async({page})=>{
+  await page.setViewportSize({width:1750,height:900})
+  const getLayout=()=>page.evaluate(()=>{
+    const rect=selector=>document.querySelector(selector).getBoundingClientRect()
+    return {
+      headerHeight:rect('header.topbar').height,
+      sidebarTop:rect('aside.sidebar').top,
+      previewTop:rect('aside.preview').top,
+      previewBottom:rect('aside.preview').bottom,
+      viewportHeight:innerHeight
+    }
+  })
+  const initial=await getLayout()
+  expect(initial.previewTop).toBeCloseTo(initial.headerHeight,0)
+  expect(initial.sidebarTop).toBeCloseTo(initial.previewTop,0)
+  expect(initial.previewBottom).toBeCloseTo(initial.viewportHeight,0)
+
+  await page.locator('header.topbar').evaluate(el=>{el.style.height='132px'})
+  await expect.poll(async()=>Math.abs((await getLayout()).previewTop-132)).toBeLessThan(1)
+  const grown=await getLayout()
+  expect(grown.headerHeight).toBeCloseTo(132,0)
+  expect(grown.sidebarTop).toBeCloseTo(grown.previewTop,0)
+  expect(grown.previewBottom).toBeCloseTo(grown.viewportHeight,0)
+
+  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight))
+  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBeGreaterThan(600)
+  const scrolled=await getLayout()
+  expect(scrolled.previewTop).toBeCloseTo(132,0)
+  expect(scrolled.previewBottom).toBeCloseTo(scrolled.viewportHeight,0)
 })
