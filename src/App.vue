@@ -130,7 +130,8 @@ function columnsTransferred(result){
   store.selectedId=result.targetId
   sidebarCategory.value='tables'
   collapseDefaults()
-  toast(`${result.moved} coluna(s) transferida(s) para ${store.selected?.nome||'a tabela de destino'}.`)
+  const dependencies=[result.triggers?`${result.triggers} trigger(s)`:null,result.checksSql?`${result.checksSql} CHECK(s) SQL`:null].filter(Boolean)
+  toast(`${result.moved} coluna(s) transferida(s) para ${store.selected?.nome||'a tabela de destino'}${dependencies.length?', com '+dependencies.join(' e '):''}.`)
 }
 function openTablePreview(){
   if(!store.selected)return

@@ -92,8 +92,8 @@ defineExpose({open})
       </div>
       <div class="column-transfer-summary" aria-live="polite">
         <strong>{{source?.nome}} → {{destination?.nome||'Escolha o destino'}}</strong>
-        <span>{{checked.length}} coluna(s) serão movidas. Identificadores, tipos, descrições, CHECKs e UNIQUEs válidos serão preservados.</span>
-        <small>Para evitar perda de vínculos, a operação bloqueia nomes duplicados, PKs incompatíveis, FKs e CHECKs dependentes e definições SQL importadas que precisam de revisão.</small>
+        <span>{{checked.length}} coluna(s) serão movidas. Identificadores, tipos, descrições, CHECKs e UNIQUEs serão preservados. CHECKs SQL importados e triggers associadas às colunas serão transferidos, preservando a ligação com suas funções SQL no projeto.</span>
+        <small>Triggers e CHECKs que dependam de colunas não selecionadas permanecem protegidos. Funções SQL são compartilhadas pelo projeto e não são apagadas. Dependências ambíguas, políticas e índices afetados exigem revisão.</small>
       </div>
       <label class="bulk-edit-tick bulk-edit-confirm">
         <input v-model="confirmed" type="checkbox"/>
