@@ -20,6 +20,7 @@ import { schemaCategories, schemaEntries } from './schemaNavigation.js'
 import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
 import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
+import { prepareExport } from './exportModes.js'
 import { Database, PanelLeftClose, PanelLeftOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, Network, FilePenLine, ArrowDownToLine, ArrowRightLeft, Eye } from 'lucide-vue-next'
 const store=useModelStore()
 const topbar=ref(null)
@@ -40,7 +41,7 @@ onUnmounted(()=>headerResizeObserver?.disconnect())
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
 const leftOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), transferDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null), schemaRulesDialog=ref(null), previewScroll=ref(null)
-const helpType=ref(''), tab=ref('txt'), notice=ref('')
+const helpType=ref(''), tab=ref('txt'), notice=ref(''), exportMode=ref('complete')
 const sidebarCategory=ref('tables')
 const sidebarCategories=computed(()=>[...schemaCategories(store.doc),{value:'diagrams',label:'Diagramas',count:null},{value:'preview',label:'Prévia',count:null}])
 const sidebarEntries=computed(()=>schemaEntries(store.doc,['preview','diagrams'].includes(sidebarCategory.value)?'tables':sidebarCategory.value))
@@ -59,7 +60,7 @@ function scrollPreviewToEnd(){
   if(previewScroll.value)previewScroll.value.scrollTop=previewScroll.value.scrollHeight
 }
 const previewEndLabel=computed(()=>previewScope.value==='table'?`Fim da prévia da tabela ${store.selected?.nome||''}`:`Fim da prévia do schema ${store.doc.schema||''} (${store.doc.tabelas.length} tabelas)`)
-watch([previewScope,tab,sidebarCategory,()=>store.selectedId],async()=>{
+watch([previewScope,tab,exportMode,sidebarCategory,()=>store.selectedId],async()=>{
   await nextTick()
   if(previewScroll.value)previewScroll.value.scrollTop=0
 })
@@ -133,6 +134,12 @@ function columnsTransferred(result){
   const dependencies=[result.triggers?`${result.triggers} trigger(s)`:null,result.checksSql?`${result.checksSql} CHECK(s) SQL`:null].filter(Boolean)
   toast(`${result.moved} coluna(s) transferida(s) para ${store.selected?.nome||'a tabela de destino'}${dependencies.length?', com '+dependencies.join(' e '):''}.`)
 }
+function columnsCopied(result){
+  store.selectedId=result.targetId
+  sidebarCategory.value='tables'
+  collapseDefaults()
+  toast(`${result.copied} coluna(s) copiadas sem regras SQL para ${store.selected?.nome||'a tabela de destino'}.`)
+}
 function openTablePreview(){
   if(!store.selected)return
   previewScope.value='table'
@@ -158,12 +165,14 @@ const fks=['BIGINT','INTEGER','SMALLINT','UUID','TEXT','VARCHAR']
 const showSize=t=>sizes.includes(t)
 const toast=t=>{notice.value=t;setTimeout(()=>notice.value='',3000)}
 function download(filename,text,type){if(store.nameError){toast(store.nameError);return}const u=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),500)}
-const txt=computed(()=>formatText(store.exported))
-const json=computed(()=>JSON.stringify(store.exported,null,2))
+const exportData=computed(()=>prepareExport(store.exported,exportMode.value))
+const txt=computed(()=>formatText(exportData.value))
+const json=computed(()=>JSON.stringify(exportData.value,null,2))
+const exportSuffix=computed(()=>exportMode.value==='structure'?'-sem-checks-funcoes-triggers':'')
 const previewData=computed(()=>{
-  if(previewScope.value==='all')return store.exported
+  if(previewScope.value==='all')return exportData.value
   const index=store.sortedTables.findIndex(t=>t.uid===store.selectedId)
-  return tablePreview(store.exported,index)
+  return tablePreview(exportData.value,index,{includeSql:exportMode.value==='complete'})
 })
 const previewContent=computed(()=>tab.value==='txt'?(previewScope.value==='table'?formatTablePreviewText(previewData.value):formatText(previewData.value)):JSON.stringify(previewData.value,null,2))
 const previewCopyLabel=computed(()=>previewScope.value==='all'?'Copiar tudo':'Copiar tabela atual')
@@ -203,8 +212,11 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
       <button class="btn ghost" @click="sqlDialog?.open()"><Upload :size="15"/> Importar SQL</button>
       <button class="btn ghost" @click="functionDialog?.open()"><Code2 :size="15"/> Funções SQL</button>
       <button class="btn ghost" :disabled="!store.doc.tabelas.length" @click="bulkDialog?.open()"><Copy :size="15"/> Edição em massa</button>
-      <button class="btn" :disabled="!!store.nameError" @click="download('modelo-banco.json',json,'application/json')"><FileJson :size="15"/> JSON</button>
-      <button class="btn primary" :disabled="!!store.nameError" @click="download('modelo-banco.txt',txt,'text/plain')"><Download :size="15"/> TXT</button>
+      <label class="export-mode-select">Exportar
+        <select v-model="exportMode" aria-label="Conteúdo da exportação"><option value="complete">Com CHECKs, funções e triggers</option><option value="structure">Sem CHECKs, funções e triggers</option></select>
+      </label>
+      <button class="btn" :disabled="!!store.nameError" @click="download('modelo-banco'+exportSuffix+'.json',json,'application/json')"><FileJson :size="15"/> JSON</button>
+      <button class="btn primary" :disabled="!!store.nameError" @click="download('modelo-banco'+exportSuffix+'.txt',txt,'text/plain')"><Download :size="15"/> TXT</button>
       <input ref="fileInput" type="file" accept=".json,application/json" hidden @change="importJson"/>
     </div>
   </header>
@@ -286,6 +298,13 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
               <button type="button" :class="{active:previewScope==='table'}" :aria-pressed="previewScope==='table'" :disabled="!store.selected" @click="previewScope='table'">Tabela{{store.selected?' · '+store.selected.nome:''}}</button>
             </div>
           </div>
+          <div class="preview-setting-group">
+            <span>Regras SQL</span>
+            <div class="tabs" role="group" aria-label="Regras SQL na prévia">
+              <button type="button" :class="{active:exportMode==='complete'}" :aria-pressed="exportMode==='complete'" @click="exportMode='complete'">Com CHECKs, funções e triggers</button>
+              <button type="button" :class="{active:exportMode==='structure'}" :aria-pressed="exportMode==='structure'" @click="exportMode='structure'">Sem CHECKs, funções e triggers</button>
+            </div>
+          </div>
           <div class="preview-setting-group preview-format-group">
             <span>Formato</span>
             <div class="tabs" role="group" aria-label="Formato da prévia">
@@ -296,7 +315,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
         </div>
         <div class="code-preview preview-page-code">
           <div class="code-toolbar">
-            <span>{{tab.toUpperCase()}} · {{previewScope==='all'?'Esquema completo':store.selected?.nome||'Tabela'}}</span>
+            <span>{{tab.toUpperCase()}} · {{previewScope==='all'?'Esquema completo':store.selected?.nome||'Tabela'}} · {{exportMode==='complete'?'Com regras SQL':'Sem CHECKs/funções/triggers'}}</span>
             <div class="preview-toolbar-actions">
               <button class="code-copy" type="button" title="Ir ao final da prévia" aria-label="Ir ao final da prévia" @click="scrollPreviewToEnd"><ArrowDownToLine :size="15"/> Fim</button>
               <button class="code-copy" type="button" :title="previewCopyLabel" :aria-label="previewCopyLabel" :disabled="!!store.nameError||(previewScope==='table'&&!store.selected)" @click="copyPreview"><Copy :size="15"/> Copiar</button>
@@ -323,11 +342,11 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           <div v-if="store.selected.sqlIndices?.length"><h3>Índices</h3><pre v-for="(item,i) in store.selected.sqlIndices" :key="'index'+i">{{item}}</pre></div>
           <div v-if="store.selected.sqlPoliticas?.length"><h3>Políticas e RLS</h3><pre v-for="(item,i) in store.selected.sqlPoliticas" :key="'policy'+i">{{item}}</pre></div>
         </details>
-        <div class="sectionhead columnsheading"><h2>Colunas <span class="subtle">({{store.selected.colunas.length}})</span></h2><div class="buttons"><button class="btn" :disabled="!store.columns.length" @click="toggleAllColumns"><ChevronDown v-if="allColumnsCollapsed" :size="15"/><ChevronUp v-else :size="15"/>{{allColumnsCollapsed?'Expandir todas':'Recolher todas'}}</button><button class="btn" type="button" :disabled="store.doc.tabelas.length<2||!store.columns.length" title="Mover colunas desta tabela para outra" @click="transferDialog?.open(store.selected.uid)"><ArrowRightLeft :size="15"/> Transferir colunas</button><button class="btn" @click="addDefaults"><Plus :size="15"/> ID e datas padrão</button><button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Coluna</button></div></div>
+        <div class="sectionhead columnsheading"><h2>Colunas <span class="subtle">({{store.selected.colunas.length}})</span></h2><div class="buttons"><button class="btn" :disabled="!store.columns.length" @click="toggleAllColumns"><ChevronDown v-if="allColumnsCollapsed" :size="15"/><ChevronUp v-else :size="15"/>{{allColumnsCollapsed?'Expandir todas':'Recolher todas'}}</button><button class="btn" type="button" :disabled="store.doc.tabelas.length<2||!store.columns.length" title="Copiar colunas sem CHECKs, funções ou triggers" @click="transferDialog?.open(store.selected.uid,'copy')"><Copy :size="15"/> Copiar colunas</button><button class="btn" type="button" :disabled="store.doc.tabelas.length<2||!store.columns.length" title="Mover colunas desta tabela para outra" @click="transferDialog?.open(store.selected.uid)"><ArrowRightLeft :size="15"/> Transferir colunas</button><button class="btn" @click="addDefaults"><Plus :size="15"/> ID e datas padrão</button><button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Coluna</button></div></div>
         <div v-if="!store.selected.colunas.length" class="empty">Nenhuma coluna cadastrada. Use <strong>ID e datas padrão</strong> ou adicione uma coluna.</div>
         <p id="reorder-help" class="sr-only">Arraste pela alça para reordenar, ou use as setas para cima e para baixo com a alça em foco. ID e datas permanecem fixos.</p>
         <article v-for="c in store.columns" :key="c.uid" class="columncard" :class="{dragging:dragged?.id===c.uid,'drop-before':dropTarget?.id===c.uid&&!dropTarget.after,'drop-after':dropTarget?.id===c.uid&&dropTarget.after}" @dragover="dragOver($event,c)" @drop="dropColumn($event,c)">
-          <div class="columnhead"><button v-if="!isDefaultColumn(c)" class="drag-handle" draggable="true" :aria-label="`Reordenar coluna ${c.nome||'sem nome'}`" aria-describedby="reorder-help" title="Arrastar para reordenar · ↑ ↓ pelo teclado" @dragstart="startDrag($event,c)" @dragend="endDrag" @keydown="moveWithKeyboard($event,c)"><GripVertical :size="17"/></button><button class="cardtoggle" :aria-expanded="!collapsed.has(c.uid)" @click="toggleCard(c.uid)"><ChevronDown v-if="!collapsed.has(c.uid)" :size="16"/><ChevronUp v-else :size="16"/><strong>{{c.nome||'Nova coluna'}}</strong> <small>{{c.tipo}}</small><ColumnBadges :column="c" :table="store.selected"/></button><div class="column-actions"><button type="button" class="iconbtn duplicate" title="Duplicar coluna" :aria-label="`Duplicar coluna ${c.nome||'sem nome'}`" @click="duplicateColumn(c.uid)"><Copy :size="16"/></button><button type="button" class="iconbtn danger" title="Excluir coluna" :aria-label="`Excluir coluna ${c.nome||'sem nome'}`" @click="removeColumn(c.uid)"><Trash2 :size="16"/></button></div></div>
+          <div class="columnhead"><button v-if="!isDefaultColumn(c)" class="drag-handle" draggable="true" :aria-label="`Reordenar coluna ${c.nome||'sem nome'}`" aria-describedby="reorder-help" title="Arrastar para reordenar · ↑ ↓ pelo teclado" @dragstart="startDrag($event,c)" @dragend="endDrag" @keydown="moveWithKeyboard($event,c)"><GripVertical :size="17"/></button><button class="cardtoggle" :aria-expanded="!collapsed.has(c.uid)" @click="toggleCard(c.uid)"><ChevronDown v-if="!collapsed.has(c.uid)" :size="16"/><ChevronUp v-else :size="16"/><strong>{{c.nome||'Nova coluna'}}</strong> <small>{{c.tipo}}</small><ColumnBadges :column="c" :table="store.selected"/></button><div class="column-actions"><button type="button" class="iconbtn" title="Copiar coluna para outra tabela sem CHECKs, funções ou triggers" :aria-label="`Copiar coluna ${c.nome||'sem nome'} para outra tabela`" :disabled="store.doc.tabelas.length<2" @click="transferDialog?.open(store.selected.uid,'copy',[c.uid])"><Copy :size="16"/></button><button type="button" class="iconbtn duplicate" title="Duplicar coluna" :aria-label="`Duplicar coluna ${c.nome||'sem nome'}`" @click="duplicateColumn(c.uid)"><Copy :size="16"/></button><button type="button" class="iconbtn danger" title="Excluir coluna" :aria-label="`Excluir coluna ${c.nome||'sem nome'}`" @click="removeColumn(c.uid)"><Trash2 :size="16"/></button></div></div>
           <div v-if="!collapsed.has(c.uid)" class="columnbody">
             <div class="fields3" :class="{fields2:!showSize(c.tipo)}">
               <label>Nome<NameInput label="Nome" :model-value="c.nome" :commit="name=>store.renameColumn(c,name)"/></label>
@@ -377,7 +396,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
   </div>
   <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
   <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>
-  <ColumnTransferDialog ref="transferDialog" @moved="columnsTransferred"/>
+  <ColumnTransferDialog ref="transferDialog" @moved="columnsTransferred" @copied="columnsCopied"/>
   <SqlFunctionManager ref="functionDialog"/>
   <SchemaObjectDialog ref="objectDialog" @select-table="sidebarCategory='tables'"/>
   <SchemaRulesDialog ref="schemaRulesDialog" @open-function="name=>functionDialog?.open(name)"/>
