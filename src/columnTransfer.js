@@ -1,9 +1,9 @@
 // Transferência atômica de colunas entre tabelas do modelo (não executa SQL).
 import { normalizedName } from './modelNames.js'
 import { builderUsesColumn } from './checkBuilder.js'
-import { rewriteSqlIdentifiers } from './modelRefactor.js'
+import { planTransferSql } from './transferSqlDependencies.js'
 
-const sqlFields=['sqlRestricoes','sqlIndices']
+import { rewriteSqlIdentifiers } from './modelRefactor.js'
 const referenceMarker='__nexodb_transfer_column_reference__'
 function mentionsIdentifier(sql,name){
   return !!name&&rewriteSqlIdentifiers(String(sql??''),[{old:name,name:referenceMarker}])!==String(sql??'')
@@ -59,7 +59,6 @@ export function transferColumnsInDocument(doc,sourceId,targetId,ids){
   // CHECKs do construtor e SQL livre devem continuar íntegros nos dois lados.
   const retained=source.colunas.filter(c=>!selected.has(c.uid))
   for(const column of moved){
-    if((column.checks||[]).some(check=>check.origemRestricao))throw new Error('A coluna “'+column.nome+'” possui CHECK SQL importado. Revise/remova a restrição original antes de transferir.')
     for(const check of column.checks||[])for(const other of retained){
       if(checkMentions(check,other.nome))throw new Error('O CHECK da coluna “'+column.nome+'” depende de “'+other.nome+'”, que permanecerá na origem. Transfira ambas.')
     }
@@ -68,19 +67,15 @@ export function transferColumnsInDocument(doc,sourceId,targetId,ids){
     if(checkMentions(check,other.nome))throw new Error('O CHECK da coluna “'+column.nome+'” depende de “'+other.nome+'”. Transfira ambas ou revise o CHECK antes.')
   }
 
-  // Triggers e políticas podem conter SQL dinâmico, portanto não é seguro
-  // inferir automaticamente quais colunas referenciam.
-  if(source.sqlTriggers?.length||source.sqlPoliticas?.length){
-    throw new Error('A tabela de origem possui triggers ou políticas SQL importadas. Revise essas definições antes de transferir colunas.')
-  }
-  for(const field of sqlFields)for(const sql of source[field]||[])for(const column of moved){
-    if(mentionsIdentifier(sql,column.nome))throw new Error('Uma definição SQL importada ('+field+') referencia “'+column.nome+'”. Revise essa definição antes de transferir.')
-  }
+  // Verifica e prepara CHECKs SQL e triggers com as funções que usam NEW/OLD.
+  // Políticas e índices só impedem a transferência quando referenciam a seleção.
+  const sqlPlan=planTransferSql(doc,source,target,moved,retained)
 
   source.colunas=retained
   target.colunas=[...target.colunas,...moved]
   const movedGroupIds=new Set(movedGroups.map(group=>group.uid))
   source.uniqueCompostos=(source.uniqueCompostos||[]).filter(group=>!movedGroupIds.has(group.uid))
   target.uniqueCompostos=[...(target.uniqueCompostos||[]),...movedGroups]
-  return {moved:moved.length,sourceId,targetId,columns:moved.map(c=>c.nome)}
+  sqlPlan.apply()
+  return {moved:moved.length,sourceId,targetId,columns:moved.map(c=>c.nome),triggers:sqlPlan.triggers,checksSql:sqlPlan.checks}
 }
