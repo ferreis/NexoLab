@@ -63,5 +63,9 @@ export function formatTablePreviewText(preview){
     lines.push('','Restrições relacionais e CHECKs adicionais:')
     for(const sql of t.sqlRestricoes)lines.push(`- ${sql}`)
   }
+  if(t.sqlTriggers?.length)lines.push('', 'Triggers SQL:',...t.sqlTriggers)
+  if(preview.funcoesSql?.length)lines.push('', 'Funções SQL associadas:',...preview.funcoesSql)
+  if(t.sqlIndices?.length)lines.push('', 'Índices SQL:',...t.sqlIndices)
+  if(t.sqlPoliticas?.length)lines.push('', 'Políticas/RLS:',...t.sqlPoliticas)
   return lines.join('\n')
 }
