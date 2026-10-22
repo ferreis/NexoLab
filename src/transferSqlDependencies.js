@@ -8,7 +8,7 @@ const NAME=ID+'(?:\\s*\\.\\s*'+ID+')?'
 const ON=new RegExp('\\bON\\s+('+NAME+')(?=\\s|;|$)','i')
 const CALL=new RegExp('\\bEXECUTE\\s+(?:FUNCTION|PROCEDURE)\\s+('+NAME+')\\s*\\(','i')
 const ROW=new RegExp('\\b(?:NEW|OLD)\\s*\\.\\s*('+ID+')','gi')
-const plain=s=>String(s||'').replace(/^"|"$/g,'').replaceAll('""','')
+const plain=s=>String(s||'').replace(/^"|"$/g,'').replaceAll('""','"')
 const pieces=s=>String(s||'').match(/"(?:[^"]|"")*"|[A-Za-z_][\w$]*/g)?.map(plain)||[]
 const equal=(a,b)=>normalizedName(a)===normalizedName(b)
 const mentions=(sql,name)=>!!name&&rewriteSqlIdentifiers(sql,[{old:name,name:'__nexodb_moved_col__'}])!==sql
