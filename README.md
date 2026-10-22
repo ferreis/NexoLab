@@ -21,7 +21,7 @@ O campo **Comentário**, abaixo do nome da tabela, aceita explicações em vári
 Cada coluna também possui um campo **Comentário**, separado de **Regra**. O JSON da coluna guarda `comentario` e o comando gerado em `comentario_sql`; o TXT apresenta `COMMENT ON COLUMN "schema"."tabela"."coluna" IS 'texto';` logo após a linha da coluna. O comentário acompanha renomeações de schema, tabela e coluna, com a mesma preservação de texto e escape usados nos comentários de tabela.
 
 
-A opção **Prévia**, no seletor do menu lateral esquerdo, abre uma página central dedicada a TXT/JSON. A opção **Tabela** mostra somente a tabela selecionada, suas colunas e seus relacionamentos e CHECKs; objetos globais do schema (ENUMs, funções e comentários gerais) aparecem apenas em **Esquema completo**.
+A opção **Prévia**, no seletor do menu lateral esquerdo, abre uma página central dedicada a TXT/JSON. A opção **Tabela** mostra somente a tabela selecionada e suas definições, podendo incluir triggers e funções associadas quando o modo completo está ativo. ENUMs e comentários globais aparecem em **Esquema completo**.
 
 ## Diagramas Mermaid: mapa de ligações e diagrama ER
 
