@@ -21,12 +21,16 @@ const validDoc=doc=>{
   if(!doc||!Array.isArray(doc.tabelas))throw new Error('Modelo inválido para gerar diagramas.')
   return doc.tabelas
 }
-function allRelations(tables){
+function allRelations(tables,schema){
+  const currentSchema=normalized(schema||'public')
   const byName=new Map(tables.filter(t=>text(t.nome)).map(t=>[normalized(t.nome),t]))
   const edges=[]
   for(const from of tables)for(const column of from.colunas||[]){
     if(!column.fk||!text(column.fkTabela))continue
-    const to=byName.get(normalized(leaf(column.fkTabela)))||null
+    const target=text(column.fkTabela)
+    const parts=target.split('.')
+    const targetSchema=parts.length>1?normalized(parts.slice(0,-1).join('.')):currentSchema
+    const to=targetSchema===currentSchema?(byName.get(normalized(leaf(target)))||null):null
     edges.push({from,to,targetName:text(column.fkTabela),column,reference:text(column.fkColuna||'id')})
   }
   return edges
@@ -34,7 +38,7 @@ function allRelations(tables){
 export function diagramModel(doc,{scope='all',selectedId=null}={}){
   const tables=validDoc(doc)
   if(scope!=='all'&&scope!=='selected')throw new Error('Escopo de diagrama inválido.')
-  const relations=allRelations(tables)
+  const relations=allRelations(tables,doc.schema||doc.schema_alvo)
   const selected=tables.find(t=>t.uid===selectedId)
   const visible=scope==='all'?tables:selected?tables.filter(t=>t===selected||relations.some(r=>(r.from===selected&&r.to===t)||(r.to===selected&&r.from===t))):[]
   const visibleSet=new Set(visible)
