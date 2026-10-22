@@ -8,6 +8,7 @@ import { formatTableComment, formatColumnComment } from '../tableComments.js'
 import { parsePostgresDDL } from '../sqlImport.js'
 import { validateFunctionSql, parseFunction, replaceFunctionReference, referencesInText } from '../sqlFunctions.js'
 import { renameColumnsInDocument, renameTableInDocument, bulkReplaceName, updateImportedCheck, rewriteSqlIdentifiers } from '../modelRefactor.js'
+import { transferColumnsInDocument } from '../columnTransfer.js'
 
 export const TYPES = [
   ['BIGINT','Inteiro de 64 bits; ideal para IDs e FKs numéricas.'],
@@ -279,6 +280,16 @@ export const useModelStore=defineStore('modelador',()=>{
     doc.value=convert(draft)
     return {changed}
   }
+  function transferColumns(sourceId,targetId,ids){
+    // Preparar e validar tudo em uma cópia para evitar mudanças parciais.
+    const draft=JSON.parse(JSON.stringify(doc.value))
+    const result=transferColumnsInDocument(draft,sourceId,targetId,ids)
+    const validated=convert(draft)
+    const error=duplicateNameError(validated.tabelas)
+    if(error)throw new Error(error)
+    doc.value=validated
+    return result
+  }
   function moveColumn(id,targetId,after=false){
     const table=selected.value
     if(!table||id===targetId)return false
@@ -426,5 +437,5 @@ export const useModelStore=defineStore('modelador',()=>{
         ...(formatColumnComment(doc.value.schema,t,c)?{comentario_sql:formatColumnComment(doc.value.schema,t,c)}:{}),
         checks:checks.map(({uid,...check})=>check),...(c.pk?{imutavel:true,nullable:false,unique:c.unique||t.colunas.filter(column=>column.pk).length===1}:{})}))}))
   }))
-  return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,duplicateColumn,addDefaults,bulkRenameColumns,bulkSetColumns,moveColumn,removeColumn,importData,importSql,exported,addCompositeUnique,removeCompositeUnique,saveFunctionSql,removeFunctionSql}
+  return {doc,selectedId,selected,sortedTables,columns,primaryKeyColumns,isUnique,isCompositeUnique,isUniqueEnabled,setUnique,setCompositeUnique,isCheckEnabled,setCheck,saveCheck,removeCheck,setPrimaryKey,setForeignKey,setForeignTable,addTable,renameTable,renameColumn,nameError,removeTable,addColumn,duplicateColumn,addDefaults,bulkRenameColumns,bulkSetColumns,transferColumns,moveColumn,removeColumn,importData,importSql,exported,addCompositeUnique,removeCompositeUnique,saveFunctionSql,removeFunctionSql}
 })
