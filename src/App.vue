@@ -10,6 +10,7 @@ import CheckEditor from './components/CheckEditor.vue'
 import EnumValuesInput from './components/EnumValuesInput.vue'
 import SqlImportDialog from './components/SqlImportDialog.vue'
 import BulkEditDialog from './components/BulkEditDialog.vue'
+import ColumnTransferDialog from './components/ColumnTransferDialog.vue'
 import DiagramViewer from './components/DiagramViewer.vue'
 import SqlFunctionManager from './components/SqlFunctionManager.vue'
 import SchemaObjectDialog from './components/SchemaObjectDialog.vue'
@@ -19,7 +20,7 @@ import { schemaCategories, schemaEntries } from './schemaNavigation.js'
 import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
 import { formatText, formatTablePreviewText } from './textExport.js'
 import { tablePreview } from './tablePreview.js'
-import { Database, PanelLeftClose, PanelLeftOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, Network, FilePenLine, ArrowDownToLine } from 'lucide-vue-next'
+import { Database, PanelLeftClose, PanelLeftOpen, Plus, Trash2, Download, Upload, Info, ChevronDown, ChevronUp, KeyRound, Copy, FileJson, GripVertical, Code2, List, Workflow, Network, FilePenLine, ArrowDownToLine, ArrowRightLeft, Eye } from 'lucide-vue-next'
 const store=useModelStore()
 const topbar=ref(null)
 const headerHeight=ref(76)
@@ -38,7 +39,7 @@ onMounted(()=>{
 onUnmounted(()=>headerResizeObserver?.disconnect())
 const checkEditors=new Map(), uniqueEditors=new Map()
 function registerEditor(editors,id,instance){if(instance)editors.set(id,instance);else editors.delete(id)}
-const leftOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null), schemaRulesDialog=ref(null), previewScroll=ref(null)
+const leftOpen=ref(true), fileInput=ref(null), sqlDialog=ref(null), bulkDialog=ref(null), transferDialog=ref(null), functionDialog=ref(null), objectDialog=ref(null), schemaRulesDialog=ref(null), previewScroll=ref(null)
 const helpType=ref(''), tab=ref('txt'), notice=ref('')
 const sidebarCategory=ref('tables')
 const sidebarCategories=computed(()=>[...schemaCategories(store.doc),{value:'diagrams',label:'Diagramas',count:null},{value:'preview',label:'Prévia',count:null}])
@@ -125,6 +126,17 @@ async function addDefaultsAll(){
   toast(`Padrões em ${result.tables} tabelas: ${result.created} criadas, ${result.updated} atualizadas, ${result.skipped} ignoradas.`)
 }
 function bulkApplied(result){collapseDefaults();toast(`${result.changed} coluna(s) alterada(s).`)}
+function columnsTransferred(result){
+  store.selectedId=result.targetId
+  sidebarCategory.value='tables'
+  collapseDefaults()
+  toast(`${result.moved} coluna(s) transferida(s) para ${store.selected?.nome||'a tabela de destino'}.`)
+}
+function openTablePreview(){
+  if(!store.selected)return
+  previewScope.value='table'
+  sidebarCategory.value='preview'
+}
 const confirmation=ref(null), confirmationDialog=ref(null)
 async function askConfirmation(options){
   if(confirmation.value)return false
@@ -297,7 +309,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
       </section>
       <DiagramViewer v-else-if="sidebarCategory==='diagrams'" :model="store.doc" :selected-id="store.selectedId" :scope="diagramScope"/>
       <template v-else-if="store.selected">
-        <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><button class="btn danger" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button></div>
+        <div class="sectionhead"><div><h1>Estrutura da tabela</h1><p>Defina colunas, chaves e comportamentos esperados.</p></div><div class="buttons"><button class="btn danger" type="button" title="Solicita confirmação antes de excluir a tabela" @click="confirmDelete"><Trash2 :size="16"/> Excluir</button><button class="btn" type="button" aria-label="Prévia da tabela" title="Abrir prévia da tabela selecionada" @click="openTablePreview"><Eye :size="16"/> Prévia</button></div></div>
         <div class="formgrid">
           <label>Nome da tabela<NameInput :key="store.selected.uid" label="Nome da tabela" :model-value="store.selected.nome" :commit="name=>store.renameTable(store.selected,name)"/></label>
           <label>Comentário<textarea v-model="store.selected.comentario" rows="3" placeholder="Explique a finalidade desta tabela."/></label>
@@ -310,7 +322,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
           <div v-if="store.selected.sqlIndices?.length"><h3>Índices</h3><pre v-for="(item,i) in store.selected.sqlIndices" :key="'index'+i">{{item}}</pre></div>
           <div v-if="store.selected.sqlPoliticas?.length"><h3>Políticas e RLS</h3><pre v-for="(item,i) in store.selected.sqlPoliticas" :key="'policy'+i">{{item}}</pre></div>
         </details>
-        <div class="sectionhead columnsheading"><h2>Colunas <span class="subtle">({{store.selected.colunas.length}})</span></h2><div class="buttons"><button class="btn" :disabled="!store.columns.length" @click="toggleAllColumns"><ChevronDown v-if="allColumnsCollapsed" :size="15"/><ChevronUp v-else :size="15"/>{{allColumnsCollapsed?'Expandir todas':'Recolher todas'}}</button><button class="btn" @click="addDefaults"><Plus :size="15"/> ID e datas padrão</button><button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Coluna</button></div></div>
+        <div class="sectionhead columnsheading"><h2>Colunas <span class="subtle">({{store.selected.colunas.length}})</span></h2><div class="buttons"><button class="btn" :disabled="!store.columns.length" @click="toggleAllColumns"><ChevronDown v-if="allColumnsCollapsed" :size="15"/><ChevronUp v-else :size="15"/>{{allColumnsCollapsed?'Expandir todas':'Recolher todas'}}</button><button class="btn" type="button" :disabled="store.doc.tabelas.length<2||!store.columns.length" title="Mover colunas desta tabela para outra" @click="transferDialog?.open(store.selected.uid)"><ArrowRightLeft :size="15"/> Transferir colunas</button><button class="btn" @click="addDefaults"><Plus :size="15"/> ID e datas padrão</button><button class="btn primary" @click="store.addColumn()"><Plus :size="15"/> Coluna</button></div></div>
         <div v-if="!store.selected.colunas.length" class="empty">Nenhuma coluna cadastrada. Use <strong>ID e datas padrão</strong> ou adicione uma coluna.</div>
         <p id="reorder-help" class="sr-only">Arraste pela alça para reordenar, ou use as setas para cima e para baixo com a alça em foco. ID e datas permanecem fixos.</p>
         <article v-for="c in store.columns" :key="c.uid" class="columncard" :class="{dragging:dragged?.id===c.uid,'drop-before':dropTarget?.id===c.uid&&!dropTarget.after,'drop-after':dropTarget?.id===c.uid&&dropTarget.after}" @dragover="dragOver($event,c)" @drop="dropColumn($event,c)">
@@ -364,6 +376,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
   </div>
   <SqlImportDialog ref="sqlDialog" @imported="sqlImported"/>
   <BulkEditDialog ref="bulkDialog" @applied="bulkApplied"/>
+  <ColumnTransferDialog ref="transferDialog" @moved="columnsTransferred"/>
   <SqlFunctionManager ref="functionDialog"/>
   <SchemaObjectDialog ref="objectDialog" @select-table="sidebarCategory='tables'"/>
   <SchemaRulesDialog ref="schemaRulesDialog" @open-function="name=>functionDialog?.open(name)"/>
