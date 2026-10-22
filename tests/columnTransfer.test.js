@@ -125,6 +125,7 @@ test('não move índices ou restrições não-CHECK potencialmente quebrados',()
 test('mantém outras triggers na origem e preserva o nome original na função global',()=>{
   const doc=project()
   doc.tabelas[0].sqlTriggers=[trigger('validar_forca'), 'CREATE TRIGGER log_nome BEFORE UPDATE OF nome ON rpg.fichas FOR EACH ROW EXECUTE FUNCTION rpg.log_nome();']
+  doc.funcoesSql.push(fn('nome').replaceAll('validar_atributo','log_nome'))
   const result=transfer(doc)
   assert.equal(result.triggers,1)
   assert.equal(doc.tabelas[0].sqlTriggers.length,1)
