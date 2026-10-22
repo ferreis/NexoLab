@@ -49,7 +49,7 @@ test('CHECK composto precisa de todas as colunas mencionadas e não move parcial
   const constraint='CONSTRAINT fichas_forca_check CHECK (forca < destreza)'
   doc.tabelas[0].sqlRestricoes=[constraint]
   doc.tabelas[0].colunas[0].checks=[{uid:'check1',expressao:'forca < destreza',origemRestricao:constraint}]
-  denied(doc,['a'],/CHECK SQL depende também/)
+  denied(doc,['a'],/CHECK.*depende.*destreza/)
   transfer(doc,['a','b'])
   assert.deepEqual(doc.tabelas[1].sqlRestricoes,[constraint])
 })
