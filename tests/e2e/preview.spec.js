@@ -497,7 +497,7 @@ test('transferência move CHECK importado e trigger com função sem perder o v�
       destTriggers:doc.tabelas.find(t=>t.nome==='atributos').sqlTriggers.length,
       functionCount:doc.funcoesSql.length
     }
-  }))).toEqual({source:['nome'],dest:['codigo','forca'],destChecks:1,destTriggers:1,functionCount:1})
+  })).toEqual({source:['nome'],dest:['codigo','forca'],destChecks:1,destTriggers:1,functionCount:1})
   const next=await page.evaluate(()=>JSON.parse(localStorage.getItem('modelador-rpg-vue-v2')))
   const target=next.tabelas.find(t=>t.nome==='atributos')
   expect(target.sqlTriggers[0]).toContain('ON rpg."atributos"')
