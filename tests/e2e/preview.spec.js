@@ -455,3 +455,18 @@ test('diagrama sem margens laterais no celular e sem rolagem horizontal',async({
     expect(metrics.scrollWidth).toBeLessThanOrEqual(width)
   }
 })
+
+test('Banco ER com modelo vazio mantém Mermaid válido e não exibe erro de sintaxe',async({page})=>{
+  await page.evaluate(()=>localStorage.setItem('modelador-rpg-vue-v2',JSON.stringify({schema_alvo:'public',tabelas:[]})))
+  await page.reload()
+  await page.getByRole('button',{name:'Selecionar categoria do menu lateral'}).click()
+  await page.getByRole('option',{name:'Diagramas'}).click()
+  await page.getByRole('group',{name:'Tipo de diagrama'}).getByRole('button',{name:'Banco ER'}).click()
+  await page.getByRole('group',{name:'Tipo de diagrama'}).getByRole('button',{name:'Código'}).click()
+  const code=page.locator('.diagram-code-stage code')
+  await expect(code).toContainText('erDiagram')
+  await expect(code).not.toContainText('SEM_TABELAS[')
+  await page.getByRole('group',{name:'Tipo de diagrama'}).getByRole('button',{name:'Banco ER'}).click()
+  await expect(page.locator('.diagram-error')).toHaveCount(0)
+  await expect(page.locator('.diagram-stage img')).toHaveAttribute('src',/^blob:/,{timeout:30000})
+})

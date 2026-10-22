@@ -92,7 +92,24 @@ test('identificadores problemáticos e vazios produzem sintaxe estável, sem mut
 })
 test('modelo vazio, erro de escopo e ausência de documento são tratados explicitamente',()=>{
   assert.match(mermaidConnections({tabelas:[]}),/Nenhuma tabela/)
-  assert.match(mermaidDatabase({tabelas:[]}),/SEM_TABELAS/)
+  assert.equal(mermaidDatabase({tabelas:[]}), 'erDiagram\n  direction LR')
   assert.throws(()=>diagramModel({tabelas:[]},{scope:'none'}),/Escopo/)
   assert.throws(()=>mermaidConnections({}),/Modelo inválido/)
+})
+
+test('FK de outro schema não aponta para tabela homônima local',()=>{
+  const doc={schema:'rpg',tabelas:[
+    {uid:'local',nome:'users',colunas:[{nome:'id',tipo:'UUID',pk:true}]},
+    {uid:'origem',nome:'logins',colunas:[
+      {nome:'user_id',tipo:'UUID',fk:true,fkTabela:'auth.users',fkColuna:'id'},
+      {nome:'local_id',tipo:'UUID',fk:true,fkTabela:'rpg.users',fkColuna:'id'}
+    ]}
+  ]}
+  const model=diagramModel(doc)
+  assert.deepEqual(model.unresolved,['auth.users'])
+  assert.equal(model.edges.filter(e=>e.to===doc.tabelas[0]).length,1)
+  assert.match(mermaidDatabase(doc),/externa0/)
+  assert.match(mermaidDatabase(doc),/t0 \|\|--o\{ t1 : "local_id"/)
+  assert.match(mermaidConnections(doc),/auth.users \(não encontrada\)/)
+  assert.match(mermaidConnections(doc),/t1 -->\|"local_id → id"\| t0/)
 })
