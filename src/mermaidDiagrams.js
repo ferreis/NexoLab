@@ -69,7 +69,7 @@ export function mermaidDatabase(doc,options={}){
   const model=diagramModel(doc,options),names=ids(model)
   const direction=options.direction==='TB'?'TB':'LR'
   const lines=['erDiagram',`  direction ${direction}`]
-  if(!model.tables.length)return lines.concat('  SEM_TABELAS["Nenhuma tabela no escopo selecionado"]').join('\n')
+  if(!model.tables.length)return lines.join('\n')
   for(const table of model.tables){
     const id=names.get(table),name=erLabel(table.nome||'(sem nome)')
     const columns=table.colunas||[]
