@@ -473,7 +473,7 @@ test('Banco ER com modelo vazio mantém Mermaid válido e não exibe erro de sin
 
 test('transferência move CHECK importado e trigger com função sem perder o vínculo SQL',async({page})=>{
   const check='CONSTRAINT fichas_forca_check CHECK (forca >= 0)'
-  const functionSql='CREATE OR REPLACE FUNCTION rpg.validar_forca() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF NEW.forca < 0 THEN RAISE EXCEPTION ''negativo''; END IF; RETURN NEW; END; $fn$;'
+  const functionSql="CREATE OR REPLACE FUNCTION rpg.validar_forca() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF NEW.forca < 0 THEN RAISE EXCEPTION 'negativo'; END IF; RETURN NEW; END; $fn$;"
   const triggerSql='CREATE TRIGGER valida_forca BEFORE UPDATE ON rpg.fichas FOR EACH ROW EXECUTE FUNCTION rpg.validar_forca();'
   const model={schema_alvo:'rpg',funcoesSql:[functionSql],tabelas:[
     {nome:'fichas',colunas:[{nome:'forca',tipo:'SMALLINT',checks:[{expressao:'forca >= 0',origemRestricao:check}]},{nome:'nome',tipo:'TEXT',checks:[]}],sqlRestricoes:[check],sqlTriggers:[triggerSql]},
