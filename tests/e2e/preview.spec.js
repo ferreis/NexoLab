@@ -470,3 +470,36 @@ test('Banco ER com modelo vazio mantém Mermaid válido e não exibe erro de sin
   await expect(page.locator('.diagram-error')).toHaveCount(0)
   await expect(page.locator('.diagram-stage img')).toHaveAttribute('src',/^blob:/,{timeout:30000})
 })
+
+test('transferência move CHECK importado e trigger com função sem perder o vínculo SQL',async({page})=>{
+  const check='CONSTRAINT fichas_forca_check CHECK (forca >= 0)'
+  const functionSql='CREATE OR REPLACE FUNCTION rpg.validar_forca() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF NEW.forca < 0 THEN RAISE EXCEPTION ''negativo''; END IF; RETURN NEW; END; $fn$;'
+  const triggerSql='CREATE TRIGGER valida_forca BEFORE UPDATE ON rpg.fichas FOR EACH ROW EXECUTE FUNCTION rpg.validar_forca();'
+  const model={schema_alvo:'rpg',funcoesSql:[functionSql],tabelas:[
+    {nome:'fichas',colunas:[{nome:'forca',tipo:'SMALLINT',checks:[{expressao:'forca >= 0',origemRestricao:check}]},{nome:'nome',tipo:'TEXT',checks:[]}],sqlRestricoes:[check],sqlTriggers:[triggerSql]},
+    {nome:'atributos',colunas:[{nome:'codigo',tipo:'INTEGER',checks:[]}]}
+  ]}
+  await page.evaluate(value=>localStorage.setItem('modelador-rpg-vue-v2',JSON.stringify(value)),model)
+  await page.reload()
+  await page.getByRole('button',{name:'Transferir colunas'}).click()
+  const dialog=page.getByRole('dialog',{name:'Transferir colunas'})
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('group',{name:'Colunas da tabela de origem'}).getByRole('checkbox').first().check()
+  await dialog.getByRole('checkbox',{name:/Confirmo que 1 coluna/}).check()
+  await dialog.getByRole('button',{name:'Transferir 1 coluna(s)'}).click()
+  await expect(dialog).not.toBeVisible()
+  await expect.poll(()=>page.evaluate(()=>{
+    const doc=JSON.parse(localStorage.getItem('modelador-rpg-vue-v2'))
+    return {
+      source:doc.tabelas.find(t=>t.nome==='fichas').colunas.map(c=>c.nome),
+      dest:doc.tabelas.find(t=>t.nome==='atributos').colunas.map(c=>c.nome),
+      destChecks:doc.tabelas.find(t=>t.nome==='atributos').sqlRestricoes.length,
+      destTriggers:doc.tabelas.find(t=>t.nome==='atributos').sqlTriggers.length,
+      functionCount:doc.funcoesSql.length
+    }
+  }))).toEqual({source:['nome'],dest:['codigo','forca'],destChecks:1,destTriggers:1,functionCount:1})
+  const next=await page.evaluate(()=>JSON.parse(localStorage.getItem('modelador-rpg-vue-v2')))
+  const target=next.tabelas.find(t=>t.nome==='atributos')
+  expect(target.sqlTriggers[0]).toContain('ON rpg."atributos"')
+  expect(target.colunas.find(c=>c.nome==='forca').checks[0].origemRestricao).toBe(check)
+})
