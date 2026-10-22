@@ -92,7 +92,7 @@ test('identificadores problemáticos e vazios produzem sintaxe estável, sem mut
 })
 test('modelo vazio, erro de escopo e ausência de documento são tratados explicitamente',()=>{
   assert.match(mermaidConnections({tabelas:[]}),/Nenhuma tabela/)
-  assert.match(mermaidDatabase({tabelas:[]}),/SEM_TABELAS/)
+  assert.equal(mermaidDatabase({tabelas:[]}), 'erDiagram\n  direction LR')
   assert.throws(()=>diagramModel({tabelas:[]},{scope:'none'}),/Escopo/)
   assert.throws(()=>mermaidConnections({}),/Modelo inválido/)
 })
