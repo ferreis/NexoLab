@@ -517,6 +517,6 @@ html:has(.app.diagram-active), body:has(.app.diagram-active) { height:100%; over
 
 /* O modo de exportação é compartilhado com a prévia TXT/JSON. */
 .export-mode-select { display:flex; flex-direction:column; gap:3px; font-size:11px; font-weight:600; color:#b2c0d5; }
-.export-mode-select select { min-height:34px; max-width:260px; border:1px solid var(--line); border-radius:7px; padding:6px 9px; background:var(--input); color:var(--text); font:inherit; font-size:12px; }
+.export-mode-select select { min-height:34px; max-width:260px; border:1px solid var(--line); border-radius:7px; padding:6px 9px; background:var(--input); color:#e3e9f2; font:inherit; font-size:12px; }
 .export-mode-select select:focus-visible { outline:2px solid #ad95fa; outline-offset:2px; }
 @media (max-width:767px) { .export-mode-select { flex:1 1 100%; } .export-mode-select select { max-width:100%; width:100%; } }
