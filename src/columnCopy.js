@@ -18,7 +18,8 @@ export function copyColumnsInDocument(doc,sourceId,targetId,ids){
   const copies=originals.map(original=>{
     const column=JSON.parse(JSON.stringify(original))
     column.uid=crypto.randomUUID()
-    column.nome=availableName(targetColumns,original.nome)
+    column.nome=targetColumns.some(existing=>normalizedName(existing.nome)===normalizedName(original.nome))
+      ?availableName(targetColumns,original.nome+'_copia'):original.nome
     // PK/UNIQUE/FK/CHECK são relações e regras, não a definição estrutural simples.
     column.pk=false
     column.unique=false
