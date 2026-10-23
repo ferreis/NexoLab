@@ -16,6 +16,7 @@ import SqlFunctionManager from './components/SqlFunctionManager.vue'
 import SchemaObjectDialog from './components/SchemaObjectDialog.vue'
 import SchemaRulesDialog from './components/SchemaRulesDialog.vue'
 import SidebarCategoryMenu from './components/SidebarCategoryMenu.vue'
+import ExportModeMenu from './components/ExportModeMenu.vue'
 import { schemaCategories, schemaEntries } from './schemaNavigation.js'
 import FunctionMentionTextarea from './components/FunctionMentionTextarea.vue'
 import { formatText, formatTablePreviewText } from './textExport.js'
@@ -212,9 +213,7 @@ async function copyPreview(){if(store.nameError){toast(store.nameError);return}t
       <button class="btn ghost" @click="sqlDialog?.open()"><Upload :size="15"/> Importar SQL</button>
       <button class="btn ghost" @click="functionDialog?.open()"><Code2 :size="15"/> Funções SQL</button>
       <button class="btn ghost" :disabled="!store.doc.tabelas.length" @click="bulkDialog?.open()"><Copy :size="15"/> Edição em massa</button>
-      <label class="export-mode-select">Exportar
-        <select v-model="exportMode" aria-label="Conteúdo da exportação"><option value="complete">Com CHECKs, funções e triggers</option><option value="structure">Sem CHECKs, funções e triggers</option></select>
-      </label>
+      <ExportModeMenu v-model="exportMode"/>
       <button class="btn" :disabled="!!store.nameError" @click="download('modelo-banco'+exportSuffix+'.json',json,'application/json')"><FileJson :size="15"/> JSON</button>
       <button class="btn primary" :disabled="!!store.nameError" @click="download('modelo-banco'+exportSuffix+'.txt',txt,'text/plain')"><Download :size="15"/> TXT</button>
       <input ref="fileInput" type="file" accept=".json,application/json" hidden @change="importJson"/>
