@@ -21,7 +21,7 @@ O campo **Comentário**, abaixo do nome da tabela, aceita explicações em vári
 Cada coluna também possui um campo **Comentário**, separado de **Regra**. O JSON da coluna guarda `comentario` e o comando gerado em `comentario_sql`; o TXT apresenta `COMMENT ON COLUMN "schema"."tabela"."coluna" IS 'texto';` logo após a linha da coluna. O comentário acompanha renomeações de schema, tabela e coluna, com a mesma preservação de texto e escape usados nos comentários de tabela.
 
 
-A opção **Prévia**, no seletor do menu lateral esquerdo, abre uma página central dedicada a TXT/JSON. A opção **Tabela** mostra somente a tabela selecionada, suas colunas e seus relacionamentos e CHECKs; objetos globais do schema (ENUMs, funções e comentários gerais) aparecem apenas em **Esquema completo**.
+A opção **Prévia**, no seletor do menu lateral esquerdo, abre uma página central dedicada a TXT/JSON. A opção **Tabela** mostra somente a tabela selecionada e suas definições, podendo incluir triggers e funções associadas quando o modo completo está ativo. ENUMs e comentários globais aparecem em **Esquema completo**.
 
 ## Diagramas Mermaid: mapa de ligações e diagrama ER
 
@@ -116,7 +116,7 @@ O botão **Funções SQL** abre o catálogo de definições importadas ou criada
 
 Os campos **Regras do schema**, **Regras da tabela** e **Regra** de cada coluna aceitam texto livre. Digitar `#` abre sugestões de funções, filtradas conforme o nome digitado. É possível combinar texto com referências, por exemplo: `O registro é validado por #validar_atualizacao antes da atualização.` Os nomes citados aparecem como atalhos clicáveis para abrir a função correspondente.
 
-Na prévia **Tabela**, TXT e JSON mostram apenas informações próprias da tabela, colunas, chaves, relacionamentos FK, UNIQUEs e CHECKs. O TXT é um resumo legível e não repete comandos de comentário, triggers, índices, políticas nem objetos globais. Na prévia **Esquema** e no download integral, as instruções SQL importadas e as definições globais são preservadas.
+Na prévia **Tabela**, TXT e JSON exibem a tabela e seus relacionamentos. No modo **Com CHECKs, funções e triggers**, a prévia inclui também os triggers, índices, políticas e funções SQL ligados à tabela; CHECKs já projetados nas colunas não são duplicados. No modo **Sem CHECKs, funções e triggers**, essas declarações são omitidas. Na prévia **Esquema** e nos downloads integrais, a mesma seleção controla o conteúdo, sem modificar as regras salvas.
 
 ## Validar
 
@@ -166,3 +166,9 @@ npx wrangler pages dev dist
 O salvamento continua no `localStorage` do navegador, separado por dispositivo, perfil e endereço do site. Dados salvos em `localhost` não aparecem automaticamente no endereço público: exporte o JSON local e importe no site publicado. Para usar o mesmo projeto em outro dispositivo, transfira o JSON da mesma forma. Limpar os dados do site remove o armazenamento local; mantenha uma exportação dos projetos que quiser guardar.
 
 As explicações de Imutável, UNIQUE, Composto e CHECK ficam em ajudas compactas integradas à borda dos controles, sem ícones soltos nem exemplos: mantenha o mouse parado sobre a opção por três segundos para abrir. Mover o mouse reinicia a espera; sair cancela a abertura ou fecha a mensagem, sem fixação por clique. Os ícones são informativos, sem aparência ou ação de botão. A ajuda de CHECK fica na opção da coluna; o contador apenas expande ou recolhe as restrições. As ajudas também respondem ao foco do teclado e Escape, sem alternar o checkbox. Detalhes de conversão SQL e avisos sobre NULL nas composições usam o mesmo componente.
+
+## Copiar colunas e exportar com ou sem automações
+
+No editor de tabelas, clique em **Copiar colunas** para selecionar várias colunas e uma tabela de destino, ou use **Copiar coluna para outra tabela** no cabeçalho de cada coluna. A cópia mantém as originais, os tipos, dimensões, nulidade e descrições. Não copia as restrições **PK**, **FK**, **UNIQUE**, **CHECK**, nem triggers ou funções; identificadores novos são gerados automaticamente. O nome é mantido quando disponível e recebe `_copia`, `_copia_2` etc. se já existir no destino. Regras SQL da origem permanecem intactas. **Transferir colunas** permanece uma ação separada, que move colunas e pode levar dependências SQL validadas.
+
+No cabeçalho, escolha o conteúdo antes de clicar em **TXT** ou **JSON**: **Com CHECKs, funções e triggers** (padrão, mantendo o formato completo anterior) ou **Sem CHECKs, funções e triggers** (focado na estrutura). A escolha também está disponível na página **Prévia**, tanto no escopo **Esquema completo** quanto **Tabela selecionada**. O modo sem regras remove CHECKs das colunas, restrições SQL CHECK, triggers e definições de funções; chaves PK/FK/UNIQUE, índices e políticas RLS permanecem. As descrições textuais e os comentários também permanecem. Arquivos reduzidos recebem o sufixo `-sem-checks-funcoes-triggers` no nome. **A seleção filtra somente o arquivo e a prévia**, sem apagar definições do projeto salvo no navegador. Para conservar uma cópia integral das automações, exporte no modo completo.

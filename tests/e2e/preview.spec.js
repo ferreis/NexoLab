@@ -186,10 +186,11 @@ test('duplicar coluna usa botão ao lado de excluir, expande a cópia e gera nom
   const original=page.locator('.columncard').filter({has:page.getByRole('button',{name:'Duplicar coluna coluna_01',exact:true})})
   await expect(original).toBeVisible()
   const actions=original.locator('.column-actions button')
-  await expect(actions).toHaveCount(2)
-  await expect(actions.nth(0)).toHaveAttribute('title','Duplicar coluna')
-  await expect(actions.nth(1)).toHaveAttribute('title','Excluir coluna')
-  await actions.nth(0).click()
+  await expect(actions).toHaveCount(3)
+  await expect(actions.nth(0)).toHaveAttribute('title','Copiar coluna para outra tabela sem CHECKs, funções ou triggers')
+  await expect(actions.nth(1)).toHaveAttribute('title','Duplicar coluna')
+  await expect(actions.nth(2)).toHaveAttribute('title','Excluir coluna')
+  await actions.nth(1).click()
   await expect(page.getByRole('heading',{name:/Colunas/})).toContainText('(76)')
   const copy=page.locator('.columncard').filter({has:page.getByRole('button',{name:'Duplicar coluna coluna_01_copia',exact:true})})
   await expect(copy).toBeVisible()
@@ -502,4 +503,62 @@ test('transferência move CHECK importado e trigger com função sem perder o v�
   const target=next.tabelas.find(t=>t.nome==='atributos')
   expect(target.sqlTriggers[0]).toContain('ON rpg."atributos"')
   expect(target.colunas.find(c=>c.nome==='forca').checks[0].origemRestricao).toBe(check)
+})
+
+test('copia coluna isolada para outra tabela sem CHECKs, triggers ou funções e preserva origem',async({page})=>{
+  const check='CONSTRAINT limite CHECK (forca >= 0)'
+  const model={schema_alvo:'rpg',funcoesSql:['CREATE FUNCTION rpg.validar() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;'],tabelas:[
+    {nome:'fichas',colunas:[{nome:'forca',tipo:'SMALLINT',pk:true,unique:true,checks:[{expressao:'forca >= 0',origemRestricao:check}]}],sqlRestricoes:[check],sqlTriggers:['CREATE TRIGGER validar BEFORE UPDATE ON rpg.fichas FOR EACH ROW EXECUTE FUNCTION rpg.validar();']},
+    {nome:'atributos',colunas:[{nome:'forca',tipo:'INTEGER'},{nome:'nome',tipo:'TEXT'}]}
+  ]}
+  await page.evaluate(value=>localStorage.setItem('modelador-rpg-vue-v2',JSON.stringify(value)),model)
+  await page.reload()
+  await page.getByRole('button',{name:'Copiar coluna forca para outra tabela'}).click()
+  const dialog=page.getByRole('dialog',{name:'Copiar colunas'})
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('group',{name:'Colunas da tabela de origem'}).getByRole('checkbox').first()).toBeChecked()
+  await expect(dialog.getByText('Nenhum CHECK, PK, UNIQUE, FK, trigger ou função será copiado.')).toBeVisible()
+  await dialog.getByRole('checkbox',{name:/Confirmo que 1 coluna/}).check()
+  await dialog.getByRole('button',{name:'Copiar 1 coluna(s)'}).click()
+  await expect(dialog).not.toBeVisible()
+  await expect.poll(()=>page.evaluate(()=>{
+    const d=JSON.parse(localStorage.getItem('modelador-rpg-vue-v2'))
+    return {origin:d.tabelas[0].colunas.length,target:d.tabelas[1].colunas.length,name:d.tabelas[1].colunas[2]?.nome,checks:d.tabelas[1].colunas[2]?.checks?.length,pk:d.tabelas[1].colunas[2]?.pk,triggers:d.tabelas[1].sqlTriggers.length,originTrigger:d.tabelas[0].sqlTriggers.length,functions:d.funcoesSql.length}
+  })).toEqual({origin:1,target:3,name:'forca_copia',checks:0,pk:false,triggers:0,originTrigger:1,functions:1})
+})
+
+test('seleção com ou sem CHECKs funções e triggers controla TXT JSON e prévia sem apagar regras',async({page})=>{
+  const check='CONSTRAINT limite CHECK (forca >= 0)'
+  const model={schema_alvo:'rpg',funcoesSql:['CREATE FUNCTION rpg.validar() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;'],tabelas:[
+    {nome:'fichas',colunas:[{nome:'forca',tipo:'SMALLINT',checks:[{expressao:'forca >= 0',origemRestricao:check}]}],sqlRestricoes:[check],sqlTriggers:['CREATE TRIGGER validar BEFORE UPDATE ON rpg.fichas FOR EACH ROW EXECUTE FUNCTION rpg.validar();']}
+  ]}
+  await page.evaluate(value=>localStorage.setItem('modelador-rpg-vue-v2',JSON.stringify(value)),model)
+  await page.reload()
+  await openPreview(page)
+  const code=page.locator('.preview-scroll pre code')
+  await expect(code).toContainText('CREATE FUNCTION rpg.validar')
+  await expect(code).toContainText('CREATE TRIGGER validar')
+  await expect(code).toContainText('CHECK (forca >= 0)')
+  await page.getByRole('group',{name:'Regras SQL na prévia'}).getByRole('button',{name:'Sem CHECKs, funções e triggers'}).click()
+  await expect(code).not.toContainText('CREATE FUNCTION')
+  await expect(code).not.toContainText('CREATE TRIGGER')
+  await expect(code).not.toContainText('CHECK (')
+  await expect(code).toContainText('forca: SMALLINT')
+  await page.getByRole('group',{name:'Formato da prévia'}).getByRole('button',{name:'JSON'}).click()
+  const reduced=JSON.parse(await code.textContent())
+  expect(reduced.funcoesSql).toBeUndefined()
+  expect(reduced.tabelas[0].sqlTriggers).toBeUndefined()
+  expect(reduced.tabelas[0].colunas[0].checks).toEqual([])
+  const download=page.waitForEvent('download')
+  await page.locator('.top-actions').getByRole('button',{name:'JSON',exact:true}).click()
+  expect((await download).suggestedFilename()).toBe('modelo-banco-sem-checks-funcoes-triggers.json')
+  const downloadTxt=page.waitForEvent('download')
+  await page.locator('.top-actions').getByRole('button',{name:'TXT',exact:true}).click()
+  expect((await downloadTxt).suggestedFilename()).toBe('modelo-banco-sem-checks-funcoes-triggers.txt')
+  await page.getByRole('group',{name:'Regras SQL na prévia'}).getByRole('button',{name:'Com CHECKs, funções e triggers'}).click()
+  await expect(code).toContainText('CREATE FUNCTION')
+  const persisted=await page.evaluate(()=>JSON.parse(localStorage.getItem('modelador-rpg-vue-v2')))
+  expect(persisted.funcoesSql).toHaveLength(1)
+  expect(persisted.tabelas[0].sqlTriggers).toHaveLength(1)
+  expect(persisted.tabelas[0].colunas[0].checks).toHaveLength(1)
 })
